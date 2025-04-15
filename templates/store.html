@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block title %}Store - MarsLife Hub{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">Магазин</h1>
+        <p class="lead">Закупка необходимых припасов и реагентов</p>
+    </div>
+</div>
+
+<div class="row">
+    {% for product in products %}
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="card-title mb-0">{{ product.name }}</h5>
+            </div>
+            <img src="{{ url_for('static', filename='img/' + product.image) }}" class="card-img-top" alt="{{ product.name }}"
+                 onerror="this.src='{{ url_for('static', filename='img/placeholder.jpg') }}'">
+            <div class="card-body">
+                <p class="card-text">{{ product.description }}</p>
+                <p><strong>Стоимость:</strong> {{ product.price }} STARCOIN</p>
+                <p><strong>Запас:</strong> {{ product.stock }} единицы</p>
+                <p><span class="badge bg-secondary">{{ product.category }}</span></p>
+                <div class="d-grid">
+                    <a href="{{ url_for('product_detail', product_id=product.id) }}" class="btn btn-primary">Подробнее</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

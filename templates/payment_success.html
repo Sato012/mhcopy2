@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}Payment Successful - MarsLife Hub{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="mb-4">
+                    <i class="fas fa-check-circle text-success" style="font-size: 5rem;"></i>
+                    <h2 class="mt-3">Оплата прошла успешно!</h2>
+                    <p class="lead">Ваша транзакция успешно завершена.</p>
+                </div>
+
+                <div class="alert alert-success">
+                    <p>ID транзакции: <strong>{{ transaction.transaction_id }}</strong></p>
+                    <p>Сумма: <strong>{{ transaction.total_price }} STARCOIN</strong></p>
+                    <p>Дата: <strong>{{ transaction.transaction_date.strftime('%Y-%m-%d %H:%M') }}</strong></p>
+                    {% if transaction.payment_method == 'card' %}
+                    <p>ID карты: <strong>{{ transaction.card_number }}</strong></p>
+                    {% endif %}
+                </div>
+
+                <div class="mb-4">
+                    <h5>Детали заказа</h5>
+                    <p>Товар: <strong>{{ product.name }}</strong></p>
+                    <p>Количество: <strong>{{ transaction.quantity }}</strong></p>
+                    <p>Способ оплаты: <strong>
+                        {% if transaction.payment_method == 'card' %}cosmo карта
+                        {% elif transaction.payment_method == 'qr' %}QR-код
+                        {% else %}Не указан{% endif %}
+                    </strong></p>
+                </div>
+
+
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('transactions') }}" class="btn btn-primary">Посмотреть историю покупок</a>
+                    <a href="{{ url_for('store') }}" class="btn btn-outline-primary">Продолжить покупки</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

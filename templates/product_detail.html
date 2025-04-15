@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ product.name }} - MarsLife Hub{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12 mb-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('store') }}">Магазин</a></li>
+                <li class="breadcrumb-item active">{{ product.name }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-5">
+        <img src="{{ url_for('static', filename='img/' + product.image) }}" class="img-fluid rounded" alt="{{ product.name }}"
+             onerror="this.src='{{ url_for('static', filename='img/placeholder.jpg') }}'">
+    </div>
+    <div class="col-md-7">
+        <h1>{{ product.name }}</h1>
+        <p class="lead">{{ product.description }}</p>
+
+        <div class="mb-3">
+            <span class="badge bg-secondary">{{ product.category }}</span>
+            <span class="badge ms-2 bg-{% if product.is_available %}success{% else %}danger{% endif %}">
+                {% if product.is_available %}В наличии{% else %}Нет в наличии{% endif %}
+            </span>
+        </div>
+
+        <div class="mb-3">
+            <h4>{{ product.price }} МЕМКИОНОВ</h4>
+            <p>Запасы: {{ product.stock }} единицы</p>
+        </div>
+
+        {% if product.is_available %}
+        <form action="{{ url_for('checkout', product_id=product.id) }}" method="POST" class="mb-3">
+            <div class="mb-3">
+                <label for="quantity" class="form-label">Количество</label>
+                <input type="number" class="form-control" id="quantity"
+                       name="quantity" value="1" min="1" max="{{ product.stock }}"
+                       {% if not product.is_available %}disabled{% endif %}>
+            </div>
+            <button type="submit" class="btn btn-success btn-lg"
+                    {% if not product.is_available %}disabled{% endif %}>
+                Купить сейчас
+            </button>
+        </form>
+        {% else %}
+        <div class="alert alert-danger">
+            Этот товар временно отсутствует на складе
+        </div>
+        {% endif %}
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">Информация</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-striped">
+                    <tbody>
+                        <tr>
+                            <th>Код</th>
+                            <td>{{ product.id }}</td>
+                        </tr>
+                        <tr>
+                            <th>Категория</th>
+                            <td>{{ product.category }}</td>
+                        </tr>
+                        <tr>
+                            <th>Наличие на складе</th>
+                            <td>
+                                {% if product.stock > 10 %}
+                                    <span class="text-success">В наличии ({{ product.stock }} шт.)</span>
+                                {% elif product.stock > 0 %}
+                                    <span class="text-warning">Осталось мало ({{ product.stock }} шт.)</span>
+                                {% else %}
+                                    <span class="text-danger">Отсутствует</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

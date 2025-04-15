@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+
+{% block title %}Transactions - MarsLife Hub{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">История транзакций</h1>
+        <p class="lead">Просмотр прошлых транзакций и истории покупок.</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Ваши транзакции</h5>
+            </div>
+            <div class="card-body">
+                {% if transactions.items %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Transaction ID</th>
+                                <th>Товар</th>
+                                <th>Количество</th>
+                                <th>Всего</th>
+                                <th>Дата</th>
+                                <th>Статус</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for transaction in transactions.items %}
+                            <tr>
+                                <td>{{ transaction.transaction_id[:8] }}...</td>
+                                <td>{{ products[transaction.product_id] }}</td>
+                                <td>{{ transaction.quantity }}</td>
+                                <td>{{ transaction.total_price }} STARCOIN</td>
+                                <td>{{ transaction.transaction_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    {% if transaction.status == 'completed' %}
+                                    <span class="badge bg-success">Завершено</span>
+                                    {% elif transaction.status == 'pending' %}
+                                    <span class="badge bg-warning">В ожидании</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">{{ transaction.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('payment_success', transaction_id=transaction.transaction_id) }}" class="btn btn-sm btn-outline-primary">Вид</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Пагинация -->
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center">
+                        {% if transactions.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('transactions', page=transactions.prev_num) }}" aria-label="Previous">
+                                <span aria-hidden="true">&laquo;</span>
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <a class="page-link" href="#" tabindex="-1" aria-disabled="true">&laquo;</a>
+                        </li>
+                        {% endif %}
+
+                        {% for page_num in transactions.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                            {% if page_num %}
+                                {% if transactions.page == page_num %}
+                                <li class="page-item active"><a class="page-link" href="{{ url_for('transactions', page=page_num) }}">{{ page_num }}</a></li>
+                                {% else %}
+                                <li class="page-item"><a class="page-link" href="{{ url_for('transactions', page=page_num) }}">{{ page_num }}</a></li>
+                                {% endif %}
+                            {% else %}
+                                <li class="page-item disabled"><span class="page-link">...</span></li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if transactions.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('transactions', page=transactions.next_num) }}" aria-label="Next">
+                                <span aria-hidden="true">&raquo;</span>
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <a class="page-link" href="#" tabindex="-1" aria-disabled="true">&raquo;</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% else %}
+                <div class="alert alert-info">
+                    <p>У вас еще нет транзакций.</p>
+                    <a href="{{ url_for('store') }}" class="btn btn-primary">Вернуться к покупкам</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

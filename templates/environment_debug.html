@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block title %}Отладка параметров окружающей среды - MarsLife Hub{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">Отладка параметров окружающей среды</h1>
+        <p class="lead">Просмотр текущих значений и диапазонов для всех параметров окружающей среды.</p>
+        <a href="{{ url_for('environment') }}" class="btn btn-primary mb-3">Вернуться к управлению</a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Параметры окружающей среды</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Параметр</th>
+                                <th>Текущее значение</th>
+                                <th>Мин. значение</th>
+                                <th>Макс. значение</th>
+                                <th>Единица измерения</th>
+                                <th>Статус</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for control in env_controls %}
+                            <tr>
+                                <td>{{ control.id }}</td>
+                                <td>{{ control.parameter }}</td>
+                                <td>{{ control.current_value }}</td>
+                                <td>{{ control.min_value }}</td>
+                                <td>{{ control.max_value }}</td>
+                                <td>{{ control.unit }}</td>
+                                <td>
+                                    {% set percentage = ((control.current_value - control.min_value) / (control.max_value - control.min_value)) * 100 %}
+                                    {% if percentage < 30 or percentage > 90 %}
+                                        <span class="badge bg-danger">Критический</span>
+                                    {% elif percentage < 40 or percentage > 80 %}
+                                        <span class="badge bg-warning">Предупреждение</span>
+                                    {% else %}
+                                        <span class="badge bg-success">Нормальный</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

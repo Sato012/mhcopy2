@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - MarsLife Hub{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">Панель управления станцией</h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header bg-danger text-white">
+                <h5 class="card-title mb-0">Важные ресурсы</h5>
+            </div>
+            <div class="card-body">
+                {% for resource in resources %}
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <h6>{{ resource.name }}</h6>
+                        <span>{{ resource.current }} / {{ resource.max }} {{ resource.unit }}</span>
+                    </div>
+                    <div class="progress">
+                        {% set percentage = (resource.current / resource.max) * 100 %}
+                        {% if percentage < 30 %}
+                            {% set color = "danger" %}
+                        {% elif percentage < 70 %}
+                            {% set color = "warning" %}
+                        {% else %}
+                            {% set color = "success" %}
+                        {% endif %}
+                        <div class="progress-bar bg-{{ color }}" role="progressbar" style="width: {{ percentage }}%"></div>
+                    </div>
+                </div>
+                {% endfor %}
+                <a href="{{ url_for('resources') }}" class="btn btn-outline-danger mt-2">Управление ресурсами</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0">Контроль средой</h5>
+            </div>
+            <div class="card-body">
+                {% for control in env_controls %}
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <h6>{{ control.parameter }}</h6>
+                        <span>{{ control.current_value }} {{ control.unit }}</span>
+                    </div>
+                    <div class="progress">
+                        {% set percentage = ((control.current_value - control.min_value) / (control.max_value - control.min_value)) * 100 %}
+                        {% if percentage < 30 or percentage > 90 %}
+                            {% set color = "danger" %}
+                        {% elif percentage < 40 or percentage > 80 %}
+                            {% set color = "warning" %}
+                        {% else %}
+                            {% set color = "success" %}
+                        {% endif %}
+                        <div class="progress-bar bg-{{ color }}" role="progressbar" style="width: {{ percentage }}%"></div>
+                    </div>
+                </div>
+                {% endfor %}
+                <a href="{{ url_for('environment') }}" class="btn btn-outline-primary mt-2">Управление средой</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="card-title mb-0">Быстрые действия</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <a href="{{ url_for('store') }}" class="btn btn-outline-success w-100 py-3">
+                            <i class="fas fa-shopping-cart mb-2 d-block" style="font-size: 2rem;"></i>
+                            Закупка материалов
+                        </a>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <a href="{{ url_for('resources') }}" class="btn btn-outline-warning w-100 py-3">
+                            <i class="fas fa-tachometer-alt mb-2 d-block" style="font-size: 2rem;"></i>
+                            Мониторинг ресурсов
+                        </a>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <a href="{{ url_for('transactions') }}" class="btn btn-outline-info w-100 py-3">
+                            <i class="fas fa-history mb-2 d-block" style="font-size: 2rem;"></i>
+                            История транзакций
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Остальная часть шаблона остается без изменений -->
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block title %}QR Payment - MarsLife Hub{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">QR Code Payment</h5>
+            </div>
+            <div class="card-body text-center">
+                <!--<div class="alert alert-info">
+                    <p><strong>Note:</strong> This is a simulation for educational purposes. No real payment will be processed.</p>
+                </div>-->
+
+                <div class="mb-4">
+                    <h4>Просканируйте чтобы оплатить {{ transaction.total_price }} STARCOIN</h4>
+                    <p>Используйте мобильное устройство, чтобы отсканировать код и завершить платеж</p>
+                </div>
+
+                <div class="qr-code-container mb-4">
+                    <!-- Simulated QR code image -->
+                    <div class="border p-4 d-inline-block bg-white">
+                        <a href="http://qrcoder.ru" target="_blank"><img src="http://qrcoder.ru/code/?https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DdQw4w9WgXcQ&4&0"
+                                                                         width="164" height="164" border="0" title="QR код">
+                        </a>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <p>ID транзакции: <strong>{{ transaction.transaction_id }}</strong></p>
+                    <p>Сумма: <strong>{{ transaction.total_price }} STARCOIN</strong></p>
+                    <p>Товар: <strong>{{ product.name }}</strong></p>
+                </div>
+
+                <div class="payment-status mb-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Загрузка...</span>
+                    </div>
+                    <p class="mt-2">Ожидание оплаты...</p>
+                </div>
+
+                <div class="d-grid">
+                    <a href="{{ url_for('payment_success', transaction_id=transaction.transaction_id) }}"
+                       class="btn btn-success btn-lg" id="complete-payment-btn" style="display: none;">
+                        Завершение оплаты
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Simulate payment processing
+        setTimeout(function() {
+            // Hide spinner
+            document.querySelector('.spinner-border').style.display = 'none';
+            // Update status message
+            document.querySelector('.payment-status p').textContent = 'Payment detected! Click the button below to complete.';
+            // Show complete button
+            document.getElementById('complete-payment-btn').style.display = 'block';
+        }, 5000); // 5 seconds delay to simulate scanning and processing
+    });
+</script>
+{% endblock %}

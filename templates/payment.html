@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block title %}Payment - MarsLife Hub{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12 mb-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('store') }}">Магазин</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('product_detail', product_id=product.id) }}">{{ product.name }}</a></li>
+                <li class="breadcrumb-item active">Оплата</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Выберете способ оплаты</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-credit-card mb-3" style="font-size: 3rem;"></i>
+                                <h5>cosmo карта</h5>
+                                <p>Безопасная оплата cosmo картой</p>
+                                <a href="{{ url_for('card_payment', transaction_id=transaction.transaction_id) }}" class="btn btn-primary">Оплата картой</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-qrcode mb-3" style="font-size: 3rem;"></i>
+                                <h5>Оплата QR-кодом</h5>
+                                <p>Отсканируйте QR-код при помощи смартфона</p>
+                                <a href="{{ url_for('qr_payment', transaction_id=transaction.transaction_id) }}" class="btn btn-primary">Оплатить по QR-коду</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Итоговая стоимость заказа</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Товар:</span>
+                    <span>{{ product.name }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Количество:</span>
+                    <span>{{ transaction.quantity }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Цена за 1 единицу:</span>
+                    <span>{{ product.price }} STARCOIN</span>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <strong>Итого:</strong>
+                    <strong>{{ transaction.total_price }} STARCOIN</strong>
+                </div>
+                <div class="d-flex justify-content-between mt-2">
+                    <span>ID транзакции:</span>
+                    <span>{{ transaction.transaction_id }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

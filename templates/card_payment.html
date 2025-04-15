@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block title %}Card Payment - MarsLife Hub{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Оплата cosmo картой</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('card_payment', transaction_id=transaction.transaction_id) }}" id="payment-form">
+                    <div class="mb-3">
+                        <label for="card-number" class="form-label">ID карты</label>
+                        <input type="text" class="form-control" id="card-number" name="card_number"
+                               placeholder="Введите ID карты (до 50 символов)" maxlength="50" required>
+                        <div class="form-text"><!-- Можно вводить буквы, цифры и символы (максимум 50)--></div>
+                    </div>
+
+                    <!-- Остальные поля формы остаются без изменений -->
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="expiry-date" class="form-label">Срок</label>
+                            <input type="text" class="form-control" id="expiry-date" name="expiry_date" placeholder="MM/YY" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="cvv" class="form-label">CVV</label>
+                            <input type="text" class="form-control" id="cvv" name="cvv" placeholder="123" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="cardholder-name" class="form-label">Имя</label>
+                        <input type="text" class="form-control" id="cardholder-name" name="cardholder_name" placeholder="Иван Иванов" required>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">Оплата {{ transaction.total_price }} STARCOIN</button>
+                    </div>
+                </form>
+
+                <!-- Остальная часть шаблона без изменений -->
+                <div class="mt-4">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Товар:</span>
+                        <span>{{ product.name }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Количество:</span>
+                        <span>{{ transaction.quantity }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Итого:</span>
+                        <span>{{ transaction.total_price }} STARCOIN</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>ID транзакции</span>
+                        <span>{{ transaction.transaction_id }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('payment-form');
+
+        form.addEventListener('submit', function(event) {
+            const loadingBtn = document.querySelector('button[type="submit"]');
+            loadingBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Обработка...';
+            loadingBtn.disabled = true;
+
+            setTimeout(function() {
+                form.submit();
+            }, 2000);
+        });
+
+        // Обработчик для номера карты (разрешаем любые символы)
+        const cardNumberInput = document.getElementById('card-number');
+        cardNumberInput.addEventListener('input', function(e) {
+            // Просто ограничиваем длину до 50 символов
+            if (e.target.value.length > 50) {
+                e.target.value = e.target.value.substring(0, 50);
+            }
+        });
+
+        // Остальные обработчики без изменений
+        const expiryInput = document.getElementById('expiry-date');
+        expiryInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+
+            if (value.length > 2) {
+                value = value.substring(0, 2) + '/' + value.substring(2, 4);
+            }
+
+            e.target.value = value;
+        });
+    });
+</script>
+{% endblock %}
+
+
+
+

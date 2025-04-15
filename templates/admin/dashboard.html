@@ -1,0 +1,124 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Дашборд - Админ-панель{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">Панель администратора</h1>
+        <p class="lead">Управление системой MarsLife Hub</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="card bg-primary text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title">Пользователи</h5>
+                        <h2 class="display-4">{{ users_count }}</h2>
+                    </div>
+                    <i class="fas fa-users fa-3x"></i>
+                </div>
+            </div>
+            <div class="card-footer d-flex align-items-center justify-content-between">
+                <a href="{{ url_for('admin_users') }}" class="text-white">Подробнее</a>
+                <i class="fas fa-angle-right"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-4">
+        <div class="card bg-success text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title">Заказы</h5>
+                        <h2 class="display-4">{{ transactions_count }}</h2>
+                    </div>
+                    <i class="fas fa-shopping-cart fa-3x"></i>
+                </div>
+            </div>
+            <div class="card-footer d-flex align-items-center justify-content-between">
+                <a href="{{ url_for('admin_transactions') }}" class="text-white">Подробнее</a>
+                <i class="fas fa-angle-right"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-4">
+        <div class="card bg-warning text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title">Товары</h5>
+                        <h2 class="display-4">{{ products_count }}</h2>
+                    </div>
+                    <i class="fas fa-box fa-3x"></i>
+                </div>
+            </div>
+            <div class="card-footer d-flex align-items-center justify-content-between">
+                <a href="{{ url_for('admin_products') }}" class="text-white">Подробнее</a>
+                <i class="fas fa-angle-right"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Состояние ресурсов</h5>
+            </div>
+            <div class="card-body">
+                {% for resource in resources %}
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <h6>{{ resource.name }}</h6>
+                        <span>{{ resource.current_level }} / {{ resource.max_level }} {{ resource.unit }}</span>
+                    </div>
+                    <div class="progress">
+                        {% set percentage = (resource.current_level / resource.max_level) * 100 %}
+                        {% if percentage < 30 %}
+                            {% set color = "danger" %}
+                        {% elif percentage < 70 %}
+                            {% set color = "warning" %}
+                        {% else %}
+                            {% set color = "success" %}
+                        {% endif %}
+                        <div class="progress-bar bg-{{ color }}" role="progressbar" style="width: {{ percentage }}%"></div>
+                    </div>
+                </div>
+                {% endfor %}
+                <a href="{{ url_for('resources') }}" class="btn btn-outline-primary mt-2">Управление ресурсами</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Быстрые действия</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    <a href="{{ url_for('admin_users') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-user-plus me-2"></i>Управление пользователями
+                    </a>
+                    <a href="{{ url_for('admin_transactions') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-list me-2"></i>Просмотр всех заказов
+                    </a>
+                    <a href="{{ url_for('admin_products') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-edit me-2"></i>Управление товарами
+                    </a>
+                    <a href="{{ url_for('environment') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-sliders-h me-2"></i>Настройка окружения
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

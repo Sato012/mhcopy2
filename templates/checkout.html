@@ -1,0 +1,200 @@
+{% extends 'base.html' %}
+
+{% block title %}Checkout - MarsLife Hub{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12 mb-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('store') }}">Магазин</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('product_detail', product_id=product.id) }}">{{ product.name }}</a></li>
+                <li class="breadcrumb-item active">Оформить заказ</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Итого</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <img src="{{ url_for('static', filename='img/' + product.image) }}" class="img-fluid rounded" alt="{{ product.name }}"
+                             onerror="this.src='{{ url_for('static', filename='img/placeholder.jpg') }}'">
+                    </div>
+                    <div class="col-md-9">
+                        <h5>{{ product.name }}</h5>
+                        <p>{{ product.description }}</p>
+                        <div class="d-flex justify-content-between">
+                            <span>Цена за 1 штуку:</span>
+                            <span>{{ product.price }} Meмкоин</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Доступно:</span>
+                            <span>{{ product.stock }} шт.</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Количество:</span>
+                            <span id="quantity">1</span>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between">
+                            <strong>Итого:</strong>
+                            <strong id="total">{{ product.price }} STARCOIN</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Информация о доставке</h5>
+            </div>
+            <div class="card-body">
+                {% if product.stock <= 0 %}
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle me-2"></i>Товар временно отсутствует на складе
+                </div>
+                {% else %}
+                <form id="checkout-form" method="POST" action="{{ url_for('checkout', product_id=product.id) }}">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="location" class="form-label">Адрес</label>
+                            <select class="form-select" id="location" name="location" required>
+                                <option value="">Select location...</option>
+                                <option value="main_hub">Main Hub</option>
+                                <option value="research_lab">Research Laboratory</option>
+                                <option value="living_quarters">Living Quarters</option>
+                                <option value="greenhouse">Greenhouse</option>
+                                <option value="engineering">Engineering Bay</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="priority" class="form-label">Priority</label>
+                            <select class="form-select" id="priority" name="priority">
+                                <option value="standard">Standard</option>
+                                <option value="urgent">Urgent (+50 Credits)</option>
+                                <option value="emergency">Emergency (+200 Credits)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Special Instructions</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="quantity" class="form-label">Количество</label>
+                        <input type="number"
+                               class="form-control {% if product.stock <= 0 %}is-invalid{% endif %}"
+                               id="quantity-input"
+                               name="quantity"
+                               value="1"
+                               min="1"
+                               max="{{ product.stock }}"
+                               {% if product.stock <= 0 %}disabled{% endif %}
+                               required>
+                        {% if product.stock <= 0 %}
+                        <div class="invalid-feedback">
+                            Товар отсутствует на складе
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit"
+                                class="btn btn-primary {% if product.stock <= 0 %}disabled{% endif %}"
+                                {% if product.stock <= 0 %}disabled{% endif %}>
+                            {% if product.stock > 0 %}
+                            Proceed to Payment
+                            {% else %}
+                            Товар недоступен
+                            {% endif %}
+                        </button>
+                    </div>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Детали заказа</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Subtotal:</span>
+                    <span id="subtotal">{{ product.price }} Credits</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Priority Fee:</span>
+                    <span id="priority-fee">0 Credits</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Processing Fee:</span>
+                    <span>10 Credits</span>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <strong>Total:</strong>
+                    <strong id="grand-total">{{ product.price + 10 }} Credits</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        {% if product.stock > 0 %}
+        const quantityInput = document.getElementById('quantity-input');
+        const quantityDisplay = document.getElementById('quantity');
+        const subtotalDisplay = document.getElementById('subtotal');
+        const priorityFeeDisplay = document.getElementById('priority-fee');
+        const totalDisplay = document.getElementById('total');
+        const grandTotalDisplay = document.getElementById('grand-total');
+        const prioritySelect = document.getElementById('priority');
+
+        const unitPrice = {{ product.price }};
+        const processingFee = 10;
+
+        function updateTotals() {
+            const quantity = parseInt(quantityInput.value);
+            const subtotal = unitPrice * quantity;
+
+            let priorityFee = 0;
+            if (prioritySelect.value === 'urgent') {
+                priorityFee = 50;
+            } else if (prioritySelect.value === 'emergency') {
+                priorityFee = 200;
+            }
+
+            const grandTotal = subtotal + priorityFee + processingFee;
+
+            quantityDisplay.textContent = quantity;
+            subtotalDisplay.textContent = subtotal + ' Credits';
+            priorityFeeDisplay.textContent = priorityFee + ' Credits';
+            totalDisplay.textContent = subtotal + ' Credits';
+            grandTotalDisplay.textContent = grandTotal + ' Credits';
+        }
+
+        quantityInput.addEventListener('change', updateTotals);
+        prioritySelect.addEventListener('change', updateTotals);
+
+        // Initial update
+        updateTotals();
+        {% endif %}
+    });
+</script>
+{% endblock %}
