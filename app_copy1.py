@@ -761,7 +761,6 @@ def checkout(product_id):
 
     product = Product.query.get_or_404(product_id)
 
-    # Жесткая проверка наличия товара
     if not product.is_available:
         flash('Этот товар временно отсутствует на складе', 'danger')
         return redirect(url_for('product_detail', product_id=product_id))
@@ -773,7 +772,6 @@ def checkout(product_id):
             flash('Некорректное количество', 'danger')
             return redirect(url_for('checkout', product_id=product_id))
 
-        # Проверка количества
         if quantity <= 0:
             flash('Количество должно быть положительным числом', 'danger')
             return redirect(url_for('checkout', product_id=product_id))
@@ -784,7 +782,6 @@ def checkout(product_id):
 
         total_price = product.price * quantity
 
-        # Создаем транзакцию
         transaction = Transaction(
             user_id=session['user_id'],
             product_id=product_id,
