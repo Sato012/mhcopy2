@@ -752,6 +752,8 @@ def product_detail(product_id):
     return render_template('product_detail.html', product=product)
 
 
+
+
 @app.route('/checkout/<int:product_id>', methods=['GET', 'POST'])
 def checkout(product_id):
     if 'user_id' not in session:
@@ -823,6 +825,12 @@ def payment(transaction_id):
         try:
             transaction.status = 'completed'
             product.stock -= transaction.quantity
+
+            # Автоматическое пополнение, если товар закончился
+            if product.stock == 0:
+                product.stock = 99  # Устанавливаем базовый уровень пополнения
+                flash(f'Товар "{product.name}" был автоматически пополнен до 99 единиц', 'info')
+
             db.session.commit()
             flash('Оплата прошла успешно!', 'success')
             return redirect(url_for('payment_success', transaction_id=transaction_id))
@@ -832,6 +840,7 @@ def payment(transaction_id):
             return redirect(url_for('payment', transaction_id=transaction_id))
 
     return render_template('payment.html', transaction=transaction, product=product)
+
 
 @app.route('/payment/card/<transaction_id>', methods=['GET', 'POST'])
 def card_payment(transaction_id):
@@ -850,13 +859,18 @@ def card_payment(transaction_id):
         transaction.status = 'completed'
 
         product.stock -= transaction.quantity
+
+        # Автоматическое пополнение, если товар закончился
+        if product.stock == 0:
+            product.stock = 99  # Устанавливаем базовый уровень пополнения
+            flash(f'Товар "{product.name}" был автоматически пополнен до 99 единиц', 'info')
+
         db.session.commit()
 
         flash('Оплата картой прошла успешно!', 'success')
         return redirect(url_for('payment_success', transaction_id=transaction_id))
 
     return render_template('card_payment.html', transaction=transaction, product=product)
-
 
 @app.route('/payment/qr/<transaction_id>')
 def qr_payment(transaction_id):
@@ -901,7 +915,7 @@ def transactions():
     products = {}
     for transaction in user_transactions.items:
         product = Product.query.get(transaction.product_id)
-        products[transaction.product_id] = product.name if product else "Unknown Product"
+        products[transaction.product_id] = product.name if product else "Неизвестно"
 
     return render_template('transactions.html',
                          transactions=user_transactions,
