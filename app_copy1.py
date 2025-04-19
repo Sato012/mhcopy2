@@ -443,10 +443,6 @@ def admin_add_user():
 def admin_edit_user():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    admin_user = User.query.get(session['user_id'])
-    if not admin_user or admin_user.role != 'admin':
-        flash('У вас нет доступа к админской панели', 'danger')
-        return redirect(url_for('index'))
     user_id = request.form.get('user_id')
     username = request.form.get('username')
     email = request.form.get('email')
