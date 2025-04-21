@@ -12,7 +12,6 @@ from logging.handlers import RotatingFileHandler
 import os
 
 load_dotenv()
-print("ТЕСТ")
 
 app = Flask(__name__)
 
