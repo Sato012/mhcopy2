@@ -10,7 +10,6 @@ from sqlalchemy.sql import text
 import logging
 from logging.handlers import RotatingFileHandler
 import os
-
 load_dotenv()
 
 app = Flask(__name__)
@@ -558,65 +557,108 @@ def update_resource():
     session['resources'] = resources_data
     return redirect(url_for('resources'))
 
+
+
 @app.route('/store')
 def store():
     if 'user_id' not in session:
         return redirect(url_for('login'))
+
     user = db.session.get(User, session['user_id'])
     search_query = request.args.get('search', '').strip()
     page = request.args.get('page', 1, type=int)
     per_page = 9
+
     try:
+        is_injection = any(keyword in search_query.lower() for keyword in [
+            '=', ' or ', ' and ', 'select', 'pg_sleep', 'exists', '--'
+        ])
+
         if search_query:
-            # SQL-запрос (сохраняем ваш текущий уязвимый запрос)
-            raw_query = (
-                f"SELECT id, name, description, price, stock, category, image "
-                f"FROM product "
-                f"WHERE name LIKE '%{search_query}%' "
-                f"OR description LIKE '%{search_query}%' "
-                f"OR category LIKE '%{search_query}%' "
-                f"OR CAST('{search_query}' AS TEXT) = '1'"
-            )
-            with db.engine.connect() as connection:
-                result = connection.execute(text(raw_query))
-                products_list = []
-                for row in result:
-                    if row[0] is not None and isinstance(row[0], int):
-                        products_list.append({
-                            'id': row[0],
-                            'name': row[1] or '',
-                            'description': row[2] or '',
-                            'price': float(row[3]) if row[3] is not None else 0.0,
-                            'stock': int(row[4]) if row[4] is not None else 0,
-                            'category': row[5] or '',
-                            'image': row[6] or '',
-                            'is_available': row[4] > 0 if row[4] is not None else False
-                        })
-            total = len(products_list)
-            if total == 0:
-                flash(f'Товар по запросу "{search_query}" не найден. Попробуйте изменить запрос или сбросьте поиск.', 'info')
-            # Создаём объект пагинации, совместимый с шаблоном
-            start = (page - 1) * per_page
-            end = start + per_page
-            paginated_products = products_list[start:end]
-            total_pages = total // per_page + (1 if total % per_page else 0)
-            pagination = SimpleNamespace(
-                items=[SimpleNamespace(**item) for item in paginated_products],  # Преобразуем словари в объекты
-                page=page,
-                pages=total_pages if total_pages > 0 else 1,  # Минимум 1 страница
-                has_next=page < total_pages,
-                has_prev=page > 1,
-                prev_num=page - 1 if page > 1 else 1,
-                next_num=page + 1 if page < total_pages else total_pages,
-                iter_pages=lambda: range(1, total_pages + 1)  # Для пагинации в шаблоне
-            )
+            if is_injection:
+                # Обёртка для pg_sleep() → чтобы не падал тип void
+                if 'pg_sleep' in search_query.lower():
+                    search_query = f"EXISTS (SELECT 1 WHERE {search_query})"
+
+                raw_query = (
+                    f"SELECT id, name, description, price, stock, category, image "
+                    f"FROM product WHERE {search_query}"
+                )
+                print(f"[DEBUG] Executing raw SQL injection query: {raw_query}")
+
+                with db.engine.connect() as connection:
+                    result = connection.execute(text(raw_query))
+                    rows = list(result)
+
+                if rows:
+                    flash('Товар найден', 'success')
+                else:
+                    flash(f'Товар по запросу "{search_query}" не найден.', 'info')
+
+                # Инъекционный ответ без отображения данных
+                pagination = SimpleNamespace(
+                    items=[],
+                    page=1,
+                    pages=1,
+                    has_next=False,
+                    has_prev=False,
+                    prev_num=1,
+                    next_num=1,
+                    iter_pages=lambda: [1]
+                )
+            else:
+                # Обычный безопасный поиск
+                query = text(
+                    "SELECT id, name, description, price, stock, category, image "
+                    "FROM product "
+                    "WHERE name ILIKE :search "
+                    "OR description ILIKE :search "
+                    "OR category ILIKE :search"
+                )
+                with db.engine.connect() as connection:
+                    result = connection.execute(query, {"search": f"%{search_query}%"})
+                    products_list = []
+                    for row in result:
+                        if row[0] is not None and isinstance(row[0], int):
+                            products_list.append({
+                                'id': row[0],
+                                'name': row[1] or '',
+                                'description': row[2] or '',
+                                'price': float(row[3]) if row[3] is not None else 0.0,
+                                'stock': int(row[4]) if row[4] is not None else 0,
+                                'category': row[5] or '',
+                                'image': row[6] or '',
+                                'is_available': row[4] > 0 if row[4] is not None else False
+                            })
+
+                total = len(products_list)
+                if total == 0:
+                    flash(f'Товар по запросу "{search_query}" не найден.', 'info')
+
+                start = (page - 1) * per_page
+                end = start + per_page
+                total_pages = total // per_page + (1 if total % per_page else 0)
+
+                pagination = SimpleNamespace(
+                    items=[SimpleNamespace(**item) for item in products_list[start:end]],
+                    page=page,
+                    pages=total_pages if total_pages > 0 else 1,
+                    has_next=page < total_pages,
+                    has_prev=page > 1,
+                    prev_num=page - 1 if page > 1 else 1,
+                    next_num=page + 1 if page < total_pages else total_pages,
+                    iter_pages=lambda: range(1, total_pages + 1)
+                )
         else:
+            # Без параметров — показать все товары
             query = Product.query
             pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+
         return render_template('store.html', products=pagination, user=user, search_query=search_query)
+
     except Exception as e:
-        flash(f'Ошибка при поиске в магазине: {str(e)}', 'danger')
-        # Возвращаем пустую пагинацию в случае ошибки
+        print(f"[ERROR] {e}")
+        flash('Ошибка при выполнении запроса', 'danger')
         pagination = SimpleNamespace(
             items=[],
             page=1,
@@ -628,6 +670,7 @@ def store():
             iter_pages=lambda: [1]
         )
         return render_template('store.html', products=pagination, user=user, search_query=search_query)
+
 
 @app.route('/product/<int:product_id>')
 def product_detail(product_id):
