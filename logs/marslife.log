@@ -36,3 +36,12 @@
 [2025-04-18 18:14:26,001] INFO in app_copy1: === MarsLifeHub запущен ===
 [2025-04-18 19:21:20,154] INFO in app_copy1: === MarsLifeHub запущен ===
 [2025-04-18 19:21:20,971] INFO in app_copy1: === MarsLifeHub запущен ===
+[2025-04-23 11:59:13,372] INFO in app_copy1: === MarsLifeHub запущен ===
+[2025-04-23 11:59:14,031] INFO in app_copy1: === MarsLifeHub запущен ===
+[2025-04-23 12:00:24,630] INFO in app_copy1: Новый пользователь зарегистрирован: username="Artem", email="artem@mars.ru", ip=127.0.0.1
+[2025-04-23 12:01:27,298] INFO in app_copy1: Новый пользователь зарегистрирован: username="qwer", email="qwer@qwer.com", ip=127.0.0.1
+[2025-04-23 12:05:48,915] INFO in app_copy1: === MarsLifeHub запущен ===
+[2025-04-23 12:05:49,764] INFO in app_copy1: === MarsLifeHub запущен ===
+[2025-04-23 12:13:17,679] INFO in app_copy1: === MarsLifeHub запущен ===
+[2025-04-23 12:13:18,452] INFO in app_copy1: === MarsLifeHub запущен ===
+[2025-04-23 12:14:23,370] INFO in app_copy1: === MarsLifeHub запущен ===

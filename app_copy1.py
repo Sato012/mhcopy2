@@ -737,8 +737,8 @@ def payment(transaction_id):
             transaction.status = 'completed'
             product.stock -= transaction.quantity
             if product.stock == 0:
-                product.stock = 99  # Устанавливаем базовый уровень пополнения
-                flash(f'Товар "{product.name}" был автоматически пополнен до 99 единиц', 'info')
+                product.stock = 999  # Устанавливаем базовый уровень пополнения
+                flash(f'Товар "{product.name}" был автоматически пополнен до 999 единиц', 'info')
             db.session.commit()
             flash('Оплата прошла успешно!', 'success')
             return redirect(url_for('payment_success', transaction_id=transaction_id))
@@ -761,8 +761,8 @@ def card_payment(transaction_id):
         transaction.status = 'completed'
         product.stock -= transaction.quantity
         if product.stock == 0:
-             product.stock = 99  # Устанавливаем базовый уровень пополнения
-             flash(f'Товар "{product.name}" был автоматически пополнен до 99 единиц', 'info')
+             product.stock = 999  # Устанавливаем базовый уровень пополнения
+             flash(f'Товар "{product.name}" был автоматически пополнен до 999 единиц', 'info')
         db.session.commit()
         flash('Оплата картой прошла успешно!', 'success')
         return redirect(url_for('payment_success', transaction_id=transaction_id))
