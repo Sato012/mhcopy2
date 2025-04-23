@@ -11,23 +11,18 @@ import logging
 from logging.handlers import RotatingFileHandler
 import os
 load_dotenv()
+from Config import Config
 
 app = Flask(__name__)
 
-# Конфигурация приложения
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'fallback-secret-key')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'postgresql://postgres:987654@localhost/testdb')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config.from_object(Config)
 
-# Инициализация базы данных
 db = SQLAlchemy(app)
 
 def setup_logging():
-    # Создаем папку для логов, если её нет
     if not os.path.exists('logs'):
         os.makedirs('logs')
 
-    # Настройка файлового логгера
     file_handler = RotatingFileHandler(
         'logs/marslife.log',
         maxBytes=10240,  # 10KB
@@ -39,12 +34,10 @@ def setup_logging():
     ))
     file_handler.setLevel(logging.INFO)
 
-    # Добавляем логгер к приложению
     app.logger.addHandler(file_handler)
     app.logger.setLevel(logging.INFO)
     app.logger.info('=== MarsLifeHub запущен ===')
 
-# Инициализируем логирование
 setup_logging()
 
 # Database Models
