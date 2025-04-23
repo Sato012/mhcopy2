@@ -558,7 +558,6 @@ def update_resource():
     return redirect(url_for('resources'))
 
 
-
 @app.route('/store')
 def store():
     if 'user_id' not in session:
@@ -569,33 +568,26 @@ def store():
     page = request.args.get('page', 1, type=int)
     per_page = 9
 
+    if 'guessed_columns' not in session:
+        session['guessed_columns'] = []
+
+    if 'union select' in search_query.lower():
+        union_index = search_query.lower().find('union select')
+        union_part = search_query[union_index:]
+        select_part = union_part[len('union select'):].strip()
+        columns_part = select_part[:select_part.lower().find('from')].strip()
+        requested_columns = [col.strip() for col in columns_part.split(',')]
+        if all(col.lower() == 'null' for col in requested_columns):
+            session['guessed_columns'] = []
+
     try:
         is_injection = any(keyword in search_query.lower() for keyword in [
-            '=', ' or ', ' and ', 'select', 'pg_sleep', 'exists', '--'
+            '1=1', 'pg_sleep', 'union select', '=', ' or ', ' and ', 'select', 'exists', '--'
         ])
 
-        if search_query:
-            if is_injection:
-                # Обёртка для pg_sleep() → чтобы не падал тип void
-                if 'pg_sleep' in search_query.lower():
-                    search_query = f"EXISTS (SELECT 1 WHERE {search_query})"
-
-                raw_query = (
-                    f"SELECT id, name, description, price, stock, category, image "
-                    f"FROM product WHERE {search_query}"
-                )
-                print(f"[DEBUG] Executing raw SQL injection query: {raw_query}")
-
-                with db.engine.connect() as connection:
-                    result = connection.execute(text(raw_query))
-                    rows = list(result)
-
-                if rows:
-                    flash('Товар найден', 'success')
-                else:
-                    flash(f'Товар по запросу "{search_query}" не найден.', 'info')
-
-                # Инъекционный ответ без отображения данных
+        if search_query and is_injection:
+            if 'pg_sleep' in search_query.lower():
+                flash('Товар найден', 'success')
                 pagination = SimpleNamespace(
                     items=[],
                     page=1,
@@ -606,8 +598,145 @@ def store():
                     next_num=1,
                     iter_pages=lambda: [1]
                 )
+                return render_template('store.html', products=pagination, user=user, search_query=search_query)
+
+            elif 'union select' in search_query.lower():
+                try:
+                    union_index = search_query.lower().find('union select')
+                    union_part = search_query[union_index:]
+
+                    select_part = union_part[len('union select'):].strip()
+                    if 'from' not in select_part.lower():
+                        raise Exception("Invalid UNION SELECT query: missing FROM clause")
+
+                    columns_part = select_part[:select_part.lower().find('from')].strip()
+                    table_part = select_part[select_part.lower().find('from') + len('from'):].strip()
+                    table_name = table_part.split()[0].strip()
+
+                    if table_name.lower() == 'user':
+                        table_part = table_part.replace('user', '"user"', 1)
+
+                    table_columns = {
+                        'product': ['id', 'name', 'description', 'price', 'stock', 'category', 'image'],
+                        'user': ['id', 'username', 'email', 'password', 'role'],
+                        'resource': ['id', 'name', 'current_level', 'max_level', 'unit', 'last_updated'],
+                        'environment_control': ['id', 'parameter', 'current_value', 'min_value', 'max_value', 'unit'],
+                        'transaction': ['id', 'user_id', 'product_id', 'quantity', 'total_price', 'transaction_date',
+                                        'transaction_id', 'status', 'payment_method', 'card_number']
+                    }
+
+                    if table_name.lower() not in table_columns:
+                        raise Exception(f"Unknown table: {table_name}")
+
+                    expected_columns = table_columns[table_name.lower()]
+                    num_expected_columns = len(expected_columns)
+
+                    requested_columns = [col.strip() for col in columns_part.split(',')]
+                    num_columns = len(requested_columns)
+
+                    if num_columns != num_expected_columns:
+                        raise Exception(
+                            f"Invalid number of columns: expected {num_expected_columns}, got {num_columns}")
+
+                    for i, (req_col, exp_col) in enumerate(zip(requested_columns, expected_columns)):
+                        if req_col.lower() != 'null' and req_col.lower() != exp_col.lower():
+                            raise Exception(
+                                f"Invalid column order: expected {exp_col} at position {i + 1}, got {req_col}")
+                        if req_col.lower() != 'null' and req_col.lower() == exp_col.lower():
+                            if exp_col not in session['guessed_columns']:
+                                session['guessed_columns'].append(exp_col)
+
+                    type_casts = {
+                        'product': ['CAST(NULL AS INTEGER)', 'CAST(NULL AS TEXT)', 'CAST(NULL AS TEXT)',
+                                    'CAST(NULL AS NUMERIC)', 'CAST(NULL AS INTEGER)', 'CAST(NULL AS TEXT)',
+                                    'CAST(NULL AS TEXT)'],
+                        'user': ['CAST(NULL AS INTEGER)', 'CAST(NULL AS TEXT)', 'CAST(NULL AS TEXT)',
+                                 'CAST(NULL AS TEXT)', 'CAST(NULL AS TEXT)'],
+                        'resource': ['CAST(NULL AS INTEGER)', 'CAST(NULL AS TEXT)', 'CAST(NULL AS INTEGER)',
+                                     'CAST(NULL AS INTEGER)', 'CAST(NULL AS TEXT)', 'CAST(NULL AS TIMESTAMP)'],
+                        'environment_control': ['CAST(NULL AS INTEGER)', 'CAST(NULL AS TEXT)', 'CAST(NULL AS NUMERIC)',
+                                                'CAST(NULL AS NUMERIC)', 'CAST(NULL AS NUMERIC)', 'CAST(NULL AS TEXT)'],
+                        'transaction': ['CAST(NULL AS INTEGER)', 'CAST(NULL AS INTEGER)', 'CAST(NULL AS INTEGER)',
+                                        'CAST(NULL AS INTEGER)', 'CAST(NULL AS NUMERIC)', 'CAST(NULL AS TIMESTAMP)',
+                                        'CAST(NULL AS TEXT)', 'CAST(NULL AS TEXT)', 'CAST(NULL AS TEXT)',
+                                        'CAST(NULL AS TEXT)']
+                    }
+
+                    dummy_columns = ', '.join(type_casts[table_name.lower()])
+                    union_part_modified = f"UNION SELECT {columns_part} FROM {table_part}"
+                    raw_query = f"SELECT {dummy_columns} WHERE 1=0 {union_part_modified}"
+
+                    app.logger.info(f"Executing query: {raw_query}")
+                    with db.engine.connect() as connection:
+                        result = connection.execute(text(raw_query))
+                        columns = expected_columns
+                        rows = list(result)
+
+                    table_data = []
+                    for row in rows:
+                        row_dict = {}
+                        for idx, col in enumerate(columns):
+                            if col not in session['guessed_columns']:
+                                row_dict[col] = '???'
+                            else:
+                                row_dict[col] = row[idx] if row[idx] is not None else None
+                        table_data.append(row_dict)
+
+                    display_columns = []
+                    for col in columns:
+                        if col in session['guessed_columns']:
+                            display_columns.append(col)
+                        else:
+                            display_columns.append('???')
+
+                    flash('Товар найден', 'success')
+                    total = len(table_data)
+                    start = (page - 1) * per_page
+                    end = start + per_page
+                    total_pages = total // per_page + (1 if total % per_page else 0)
+
+                    pagination_data = table_data[start:end]
+                    pagination = SimpleNamespace(
+                        items=pagination_data,
+                        page=page,
+                        pages=total_pages if total_pages > 0 else 1,
+                        has_next=page < total_pages,
+                        has_prev=page > 1,
+                        prev_num=page - 1 if page > 1 else 1,
+                        next_num=page + 1 if page < total_pages else total_pages,
+                        iter_pages=lambda: range(1, total_pages + 1)
+                    )
+                    return render_template('store_table.html', columns=display_columns, table_data=pagination_data,
+                                           pagination=pagination, user=user, search_query=search_query)
+
+                except Exception as e:
+                    app.logger.error(f"SQL Error in UNION SELECT: {str(e)}")
+                    flash('Товар не найден', 'danger')
+                    return render_template('store.html', products=SimpleNamespace(
+                        items=[],
+                        page=1,
+                        pages=1,
+                        has_next=False,
+                        has_prev=False,
+                        prev_num=1,
+                        next_num=1,
+                        iter_pages=lambda: [1]
+                    ), user=user, search_query=search_query)
             else:
-                # Обычный безопасный поиск
+                flash('Товар найден', 'success')
+                pagination = SimpleNamespace(
+                    items=[],
+                    page=1,
+                    pages=1,
+                    has_next=False,
+                    has_prev=False,
+                    prev_num=1,
+                    next_num=1,
+                    iter_pages=lambda: [1]
+                )
+                return render_template('store.html', products=pagination, user=user, search_query=search_query)
+        else:
+            if search_query:
                 query = text(
                     "SELECT id, name, description, price, stock, category, image "
                     "FROM product "
@@ -649,15 +778,14 @@ def store():
                     next_num=page + 1 if page < total_pages else total_pages,
                     iter_pages=lambda: range(1, total_pages + 1)
                 )
-        else:
-            # Без параметров — показать все товары
-            query = Product.query
-            pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+            else:
+                query = Product.query
+                pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 
-        return render_template('store.html', products=pagination, user=user, search_query=search_query)
+            return render_template('store.html', products=pagination, user=user, search_query=search_query)
 
     except Exception as e:
-        print(f"[ERROR] {e}")
+        app.logger.error(f"Ошибка в маршруте /store: {str(e)}")
         flash('Ошибка при выполнении запроса', 'danger')
         pagination = SimpleNamespace(
             items=[],

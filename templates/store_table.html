@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+
+</body>
+</html>
+{% extends 'base.html' %}
+
+{% block title %}Store - MarsLife Hub (Table View){% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">МАГАЗИН</h1>
+        <p class="lead">Закупка необходимых припасов и реагентов</p>
+
+        <!-- Форма поиска -->
+        <form class="mb-4" method="GET" action="{{ url_for('store') }}">
+            <div class="input-group">
+                <input type="text" class="form-control" name="search"
+                       placeholder="Поиск товаров..." value="{{ search_query if search_query }}">
+                <button class="btn btn-primary" type="submit">Найти</button>
+                {% if search_query %}
+                <a href="{{ url_for('store') }}" class="btn btn-outline-secondary">Сбросить</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        {% if table_data %}
+        <table class="table table-bordered table-striped">
+            <thead>
+                <tr>
+                    {% for col in columns %}
+                    <th>{{ col }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in table_data %}
+                <tr>
+                    {% for col in columns %}
+                    <td>{{ row[col] if row[col] is not none else 'None' }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="alert alert-info">
+            Товары не найдены. Попробуйте изменить поисковый запрос или <a href="{{ url_for('store') }}">сбросить поиск</a>.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Пагинация -->
+{% if pagination and pagination.pages > 1 %}
+<nav aria-label="Page navigation">
+    <ul class="pagination justify-content-center">
+        {% if pagination.has_prev %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('store', page=pagination.prev_num, search=search_query) }}">Назад</a>
+        </li>
+        {% endif %}
+
+        {% for page_num in pagination.iter_pages() %}
+        <li class="page-item {% if page_num == pagination.page %}active{% endif %}">
+            <a class="page-link" href="{{ url_for('store', page=page_num, search=search_query) }}">{{ page_num }}</a>
+        </li>
+        {% endfor %}
+
+        {% if pagination.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('store', page=pagination.next_num, search=search_query) }}">Вперед</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}
