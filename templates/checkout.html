@@ -49,15 +49,16 @@
                 {% else %}
                 <form id="checkout-form" method="POST" action="{{ url_for('checkout', product_id=product.id) }}">
                     <div class="mb-3">
-                        <label for="quantity"class="form-label">Количество</label>
+                        <label for="quantity" class="form-label">Количество (макс. 3)</label>
                         <input type="number"
                                class="form-control"
                                id="quantity-input"
                                name="quantity"
                                value="1"
                                min="1"
-                               max="{{ product.stock }}"
+                               max="3"
                                required>
+                        <small class="text-muted">Можно заказать от 1 до 3 единиц</small>
                     </div>
 
                     <div class="d-flex justify-content-between mb-3">
@@ -92,7 +93,13 @@
             totalDisplay.textContent = total + ' STARCOIN';
         }
 
-        quantityInput.addEventListener('change', updateTotal);
+        quantityInput.addEventListener('change', function() {
+            if (this.value > 3) {
+                this.value = 3;
+                alert('Можно заказать максимум 3 единицы');
+            }
+            updateTotal();
+        });
         {% endif %}
     });
 </script>

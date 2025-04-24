@@ -3,10 +3,12 @@
 body {
     background-color: #f5f5f5;
     font-family: 'Roboto', sans-serif;
+    padding-top: 20px;
 }
 
 .navbar {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
 }
 
 .navbar-brand {
@@ -18,12 +20,19 @@ body {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     border-radius: 8px;
     border: none;
+    transition: transform 0.2s, box-shadow 0.2s;
     margin-bottom: 20px;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
 }
 
 .card-header {
     border-radius: 8px 8px 0 0 !important;
     font-weight: 600;
+    background-color: #f8f9fa;
 }
 
 .progress {
@@ -36,61 +45,36 @@ body {
     border-radius: 10px;
 }
 
-.resource-gauge {
-    width: 100%;
-    margin: 0 auto;
+/* Иконки */
+.navbar-nav .nav-link i {
+    width: 20px;
+    text-align: center;
+    margin-right: 5px;
 }
 
-footer {
-    margin-top: 50px;
-    padding: 20px 0;
+.fa-temperature-high { color: #e74c3c; }  /* Красный - температура */
+.fa-tint { color: #3498db; }             /* Синий - вода/влажность */
+.fa-tachometer-alt { color: #9b59b6; }   /* Фиолетовый - давление */
+.fa-smog { color: #2ecc71; }             /* Зеленый - CO2 */
+.fa-wind { color: #1abc9c; }             /* Бирюзовый - кислород */
+.fa-bolt { color: #f1c40f; }             /* Желтый - электричество */
+.fa-coffee { color: #e67e22; }           /* Оранжевый - еда */
+.fa-rocket { color: #e74c3c; }           /* Красный - логотип */
+.fa-receipt { color: #34495e; }          /* Темно-синий - транзакции */
+.fa-cog { color: #7f8c8d; }              /* Серый - настройки */
+.fa-question-circle { color: #95a5a6; }  /* Светло-серый - неизвестно */
+.fa-check-circle { color: #2ecc71; }     /* Зеленый - успех */
+.fa-exclamation-circle { color: #e74c3c; } /* Красный - ошибка */
+.fa-exclamation-triangle { color: #f39c12; } /* Оранжевый - предупреждение */
+.fa-info-circle { color: #3498db; }      /* Синий - информация */
+.fa-spinner { color: #3498db; }          /* Синий - загрузка */
+
+/* Формы */
+.form-select, .form-control {
+    padding: 10px 15px;
 }
 
-/* Mars-themed colors */
-.bg-mars {
-    background-color: #c1440e;
-    color: white;
-}
-
-.text-mars {
-    color: #c1440e;
-}
-
-.btn-mars {
-    background-color: #c1440e;
-    color: white;
-}
-
-.btn-mars:hover {
-    background-color: #a33a0c;
-    color: white;
-}
-
-/* QR Code styling */
-.qr-code-container {
-    display: inline-block;
-    padding: 15px;
-    background-color: white;
-    border-radius: 10px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-/* Payment form styling */
-#payment-form .form-control {
-    padding: 12px;
-    font-size: 16px;
-}
-
-/* Dashboard cards */
-.dashboard-card {
-    transition: transform 0.3s;
-}
-
-.dashboard-card:hover {
-    transform: translateY(-5px);
-}
-
-/* Responsive adjustments */
+/* Адаптивность */
 @media (max-width: 768px) {
     .card-title {
         font-size: 1.2rem;
@@ -99,4 +83,64 @@ footer {
     .navbar-brand {
         font-size: 1.2rem;
     }
+
+    .lead {
+        font-size: 1rem;
+    }
 }
+
+/* Дополнительные стили */
+.badge {
+    font-weight: 500;
+}
+
+.btn {
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background-color: #3498db;
+    border-color: #3498db;
+}
+
+.btn-primary:hover {
+    background-color: #2980b9;
+    border-color: #2980b9;
+}
+
+.alert {
+    border-left: 4px solid;
+}
+
+.alert-success {
+    border-left-color: #2ecc71;
+}
+
+.alert-danger {
+    border-left-color: #e74c3c;
+}
+
+.alert-info {
+    border-left-color: #3498db;
+}
+/* Анимация иконок при наведении */
+.navbar-nav .nav-link i {
+    transition: transform 0.3s ease, color 0.3s ease;
+}
+
+.navbar-nav .nav-link:hover i {
+    transform: scale(1.2);
+}
+
+/* Конкретные цвета для навбара (можно удалить, если используете inline стили) */
+.nav-icon-home { color: #3498db; }
+.nav-icon-resources { color: #2ecc71; }
+.nav-icon-environment { color: #e74c3c; }
+.nav-icon-store { color: #9b59b6; }
+.nav-icon-transactions { color: #34495e; }
+.nav-icon-user { color: #1abc9c; }
+.nav-icon-admin { color: #7f8c8d; }
+.nav-icon-logout { color: #e67e22; }
+.nav-icon-login { color: #f1c40f; }
+.nav-icon-register { color: #e84393; }
+.nav-icon-rocket { color: #e74c3c; }

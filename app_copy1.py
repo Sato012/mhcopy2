@@ -803,43 +803,57 @@ def product_detail(product_id):
         return redirect(url_for('store'))
     return render_template('product_detail.html', product=product)
 
+
 @app.route('/checkout/<int:product_id>', methods=['GET', 'POST'])
 def checkout(product_id):
     if 'user_id' not in session:
         return redirect(url_for('login'))
     product = Product.query.get_or_404(product_id)
+
     if not product.is_available:
         flash('Этот товар временно отсутствует на складе', 'danger')
         return redirect(url_for('product_detail', product_id=product_id))
+
     if request.method == 'POST':
         try:
             quantity = int(request.form.get('quantity', 1))
+
+            # Добавленная проверка на максимальное количество (3 единицы)
+            if quantity > 3:
+                flash('Можно купить не более 3 единиц одного товара за раз', 'danger')
+                return redirect(url_for('checkout', product_id=product_id))
+
+            if quantity <= 0:
+                flash('Количество должно быть положительным числом', 'danger')
+                return redirect(url_for('checkout', product_id=product_id))
+
+            if quantity > product.stock:
+                flash(f'Недостаточно товара на складе. Доступно: {product.stock}', 'danger')
+                return redirect(url_for('checkout', product_id=product_id))
+
+            total_price = product.price * quantity
+            transaction = Transaction(
+                user_id=session['user_id'],
+                product_id=product_id,
+                quantity=quantity,
+                total_price=total_price,
+                transaction_id=str(uuid.uuid4()),
+                status='pending'
+            )
+
+            try:
+                db.session.add(transaction)
+                db.session.commit()
+                return redirect(url_for('payment', transaction_id=transaction.transaction_id))
+            except Exception as e:
+                db.session.rollback()
+                flash('Ошибка при создании заказа', 'danger')
+                return redirect(url_for('product_detail', product_id=product_id))
+
         except ValueError:
             flash('Некорректное количество', 'danger')
             return redirect(url_for('checkout', product_id=product_id))
-        if quantity <= 0:
-            flash('Количество должно быть положительным числом', 'danger')
-            return redirect(url_for('checkout', product_id=product_id))
-        if quantity > product.stock:
-            flash(f'Недостаточно товара на складе. Доступно: {product.stock}', 'danger')
-            return redirect(url_for('checkout', product_id=product_id))
-        total_price = product.price * quantity
-        transaction = Transaction(
-            user_id=session['user_id'],
-            product_id=product_id,
-            quantity=quantity,
-            total_price=total_price,
-            transaction_id=str(uuid.uuid4()),
-            status='pending'
-        )
-        try:
-            db.session.add(transaction)
-            db.session.commit()
-            return redirect(url_for('payment', transaction_id=transaction.transaction_id))
-        except Exception as e:
-            db.session.rollback()
-            flash('Ошибка при создании заказа', 'danger')
-            return redirect(url_for('product_detail', product_id=product_id))
+
     return render_template('checkout.html', product=product)
 
 @app.route('/payment/<transaction_id>', methods=['GET', 'POST'])
