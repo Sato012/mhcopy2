@@ -1,6 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_sqlalchemy import SQLAlchemy
-from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import uuid
 from datetime import datetime
@@ -9,7 +8,7 @@ from types import SimpleNamespace
 from sqlalchemy.sql import text
 import logging
 from logging.handlers import RotatingFileHandler
-import os
+import hashlib
 load_dotenv()
 from Config import Config
 
@@ -192,7 +191,8 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         user = User.query.filter_by(username=username).first()
-        if user and check_password_hash(user.password, password):
+        hashed_password = hashlib.md5(password.encode('utf-8')).hexdigest()
+        if user and user.password == hashed_password:
             session['user_id'] = user.id
             session['username'] = user.username
             session['is_admin'] = (user.role == 'admin')
@@ -219,7 +219,7 @@ def register():
             app.logger.warning(f'Попытка регистрации с существующим email: {email}, ip={request.remote_addr}')
             flash('Почта уже зарегистрирована', 'danger')
         else:
-            hashed_password = generate_password_hash(password)
+            hashed_password = hashlib.md5(password.encode('utf-8')).hexdigest()
             new_user = User(username=username, email=email, password=hashed_password)
             db.session.add(new_user)
             db.session.commit()
@@ -416,10 +416,11 @@ def admin_add_user():
         flash('Пользователь с таким именем или email уже существует', 'danger')
         return redirect(url_for('admin_users'))
     try:
+        hashed_password = hashlib.md5(password.encode('utf-8')).hexdigest()
         new_user = User(
             username=username,
             email=email,
-            password=generate_password_hash(password),
+            password=hashed_password,
             role=role if role else 'astronaut'
         )
         db.session.add(new_user)
@@ -428,7 +429,7 @@ def admin_add_user():
     except Exception as e:
         db.session.rollback()
         flash(f'Ошибка при добавлении пользователя: {str(e)}', 'danger')
-    return redirect(url_for('admin_users'))
+        return redirect(url_for('admin_users'))
 
 @app.route('/admin/users/edit', methods=['POST'])
 def admin_edit_user():
@@ -451,7 +452,7 @@ def admin_edit_user():
         user.email = email
         user.role = role
         if password:
-            user.password = generate_password_hash(password)
+            user.password = hashlib.md5(password.encode('utf-8')).hexdigest()
         db.session.commit()
         flash(f'Пользователь "{username}" успешно обновлен', 'success')
     except Exception as e:
@@ -942,12 +943,13 @@ def init_db():
             db.create_all()
             print("Таблицы созданы успешно!")
             if User.query.count() == 0:
+                admin_password = hashlib.md5('admin123'.encode('utf-8')).hexdigest()
                 admin = User(username='admin', email='admin@marslife.com',
-                             password=generate_password_hash('admin123'), role='admin')
+                             password=admin_password, role='admin')
                 db.session.add(admin)
                 db.session.commit()
                 print("Тестовый пользователь добавлен.")
-            if Product.query.count() == 0:  # Исправлено: проверка через Product.query.count()
+            if Product.query.count() == 0:
                 demo_products = [
                     {'name': 'Кислородный баллон',
                      'description': 'Дополнительный запас кислорода для аварийных ситуаций',
