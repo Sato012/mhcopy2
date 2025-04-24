@@ -55,81 +55,16 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editProductModal{{ product.id }}">
+                                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal"
+                                            data-bs-target="#editProductModal{{ product.id }}">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteProductModal{{ product.id }}">
+                                    <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal"
+                                            data-bs-target="#deleteProductModal{{ product.id }}">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </td>
                             </tr>
-
-                            <!-- Edit Product Modal -->
-                            <div class="modal fade" id="editProductModal{{ product.id }}" tabindex="-1" aria-hidden="true">
-                                <div class="modal-dialog">
-                                    <div class="modal-content">
-                                        <div class="modal-header">
-                                            <h5 class="modal-title">Редактировать товар</h5>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                        </div>
-                                        <div class="modal-body">
-                                            <form method="POST" action="{{ url_for('admin_edit_product') }}">
-                                                <input type="hidden" name="product_id" value="{{ product.id }}">
-                                                <div class="mb-3">
-                                                    <label for="name{{ product.id }}" class="form-label">Название</label>
-                                                    <input type="text" class="form-control" id="name{{ product.id }}" name="name" value="{{ product.name }}" required>
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label for="description{{ product.id }}" class="form-label">Описание</label>
-                                                    <textarea class="form-control" id="description{{ product.id }}" name="description" rows="3" required>{{ product.description }}</textarea>
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label for="price{{ product.id }}" class="form-label">Цена (Credits)</label>
-                                                    <input type="number" class="form-control" id="price{{ product.id }}" name="price" value="{{ product.price }}" step="0.01" min="0" required>
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label for="stock{{ product.id }}" class="form-label">Запас</label>
-                                                    <input type="number" class="form-control" id="stock{{ product.id }}" name="stock" value="{{ product.stock }}" min="0" required>
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label for="category{{ product.id }}" class="form-label">Категория</label>
-                                                    <input type="text" class="form-control" id="category{{ product.id }}" name="category" value="{{ product.category }}">
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label for="image{{ product.id }}" class="form-label">Изображение</label>
-                                                    <input type="text" class="form-control" id="image{{ product.id }}" name="image" value="{{ product.image }}">
-                                                </div>
-                                                <div class="d-grid">
-                                                    <button type="submit" class="btn btn-primary">Сохранить изменения</button>
-                                                </div>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Delete Product Modal -->
-                            <div class="modal fade" id="deleteProductModal{{ product.id }}" tabindex="-1" aria-hidden="true">
-                                <div class="modal-dialog">
-                                    <div class="modal-content">
-                                        <div class="modal-header">
-                                            <h5 class="modal-title">Подтверждение удаления</h5>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                        </div>
-                                        <div class="modal-body">
-                                            <p>Вы уверены, что хотите удалить товар <strong>{{ product.name }}</strong>?</p>
-                                            <p class="text-danger">Это действие нельзя отменить.</p>
-                                        </div>
-                                        <div class="modal-footer">
-                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                                            <form method="POST" action="{{ url_for('admin_delete_product') }}">
-                                                <input type="hidden" name="product_id" value="{{ product.id }}">
-                                                <button type="submit" class="btn btn-danger">Удалить</button>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -138,6 +73,82 @@
         </div>
     </div>
 </div>
+
+<!-- Модальные окна для каждого товара -->
+{% for product in products %}
+<!-- Edit Product Modal -->
+<div class="modal fade" id="editProductModal{{ product.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Редактировать товар</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="POST" action="{{ url_for('admin_edit_product') }}">
+                    <input type="hidden" name="product_id" value="{{ product.id }}">
+                    <div class="mb-3">
+                        <label for="name{{ product.id }}" class="form-label">Название</label>
+                        <input type="text" class="form-control" id="name{{ product.id }}"
+                               name="name" value="{{ product.name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description{{ product.id }}" class="form-label">Описание</label>
+                        <textarea class="form-control" id="description{{ product.id }}"
+                                  name="description" rows="3" required>{{ product.description }}</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="price{{ product.id }}" class="form-label">Цена (Credits)</label>
+                        <input type="number" class="form-control" id="price{{ product.id }}"
+                               name="price" value="{{ product.price }}" step="0.01" min="0" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="stock{{ product.id }}" class="form-label">Запас</label>
+                        <input type="number" class="form-control" id="stock{{ product.id }}"
+                               name="stock" value="{{ product.stock }}" min="0" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="category{{ product.id }}" class="form-label">Категория</label>
+                        <input type="text" class="form-control" id="category{{ product.id }}"
+                               name="category" value="{{ product.category }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="image{{ product.id }}" class="form-label">Изображение</label>
+                        <input type="text" class="form-control" id="image{{ product.id }}"
+                               name="image" value="{{ product.image }}">
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Product Modal -->
+<div class="modal fade" id="deleteProductModal{{ product.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Подтверждение удаления</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы уверены, что хотите удалить товар <strong>{{ product.name }}</strong>?</p>
+                <p class="text-danger">Это действие нельзя отменить.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <form method="POST" action="{{ url_for('admin_delete_product') }}">
+                    <input type="hidden" name="product_id" value="{{ product.id }}">
+                    <button type="submit" class="btn btn-danger">Удалить</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
 
 <!-- Add Product Modal -->
 <div class="modal fade" id="addProductModal" tabindex="-1" aria-hidden="true">
@@ -181,4 +192,24 @@
         </div>
     </div>
 </div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Инициализация модальных окон
+document.addEventListener('DOMContentLoaded', function() {
+    // Обработчики для всех модальных окон
+    var modals = document.querySelectorAll('.modal');
+    modals.forEach(function(modal) {
+        modal.addEventListener('shown.bs.modal', function() {
+            // Фокусировка на первом поле ввода при открытии
+            var input = modal.querySelector('input, textarea, select');
+            if (input) {
+                input.focus();
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

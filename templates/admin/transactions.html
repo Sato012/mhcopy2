@@ -50,91 +50,18 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#viewTransactionModal{{ transaction.id }}">
+                                    <button class="btn btn-sm btn-outline-primary"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#viewTransactionModal{{ transaction.id }}">
                                         <i class="fas fa-eye"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteTransactionModal{{ transaction.id }}">
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#deleteTransactionModal{{ transaction.id }}">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </td>
                             </tr>
-
-                            <!-- View Transaction Modal -->
-                            <div class="modal fade" id="viewTransactionModal{{ transaction.id }}" tabindex="-1" aria-hidden="true">
-                                <div class="modal-dialog">
-                                    <div class="modal-content">
-                                        <div class="modal-header">
-                                            <h5 class="modal-title">Детали заказа</h5>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                        </div>
-                                        <div class="modal-body">
-                                            <div class="mb-3">
-                                                <h6>Информация о заказе</h6>
-                                                <p><strong>ID транзакции:</strong> {{ transaction.transaction_id }}</p>
-                                                <p><strong>Дата:</strong> {{ transaction.transaction_date.strftime('%Y-%m-%d %H:%M') }}</p>
-                                                <p><strong>Статус:</strong>
-                                                    {% if transaction.status == 'completed' %}
-                                                    <span class="badge bg-success">Выполнен</span>
-                                                    {% elif transaction.status == 'pending' %}
-                                                    <span class="badge bg-warning">В ожидании</span>
-                                                    {% else %}
-                                                    <span class="badge bg-secondary">{{ transaction.status }}</span>
-                                                    {% endif %}
-                                                </p>
-                                            </div>
-                                            <div class="mb-3">
-                                                <h6>Информация о пользователе</h6>
-                                                <p><strong>Пользователь:</strong> {{ users[transaction.user_id] }}</p>
-                                                <p><strong>ID пользователя:</strong> {{ transaction.user_id }}</p>
-                                            </div>
-                                            <div class="mb-3">
-                                                <h6>Информация о товаре</h6>
-                                                <p><strong>Товар:</strong> {{ products[transaction.product_id] }}</p>
-                                                <p><strong>Количество:</strong> {{ transaction.quantity }}</p>
-                                                <p><strong>Сумма:</strong> {{ transaction.total_price }} Credits</p>
-                                            </div>
-
-                                            <form method="POST" action="{{ url_for('admin_update_transaction_status') }}">
-                                                <input type="hidden" name="transaction_id" value="{{ transaction.id }}">
-                                                <div class="mb-3">
-                                                    <label for="status" class="form-label">Изменить статус</label>
-                                                    <select class="form-select" id="status" name="status">
-                                                        <option value="pending" {% if transaction.status =='pending' %}selected{% endif %}>В ожидании</option>
-                                                        <option value="completed" {% if transaction.status =='completed' %}selected{% endif %}>Выполнен</option>
-                                                        <option value="cancelled" {% if transaction.status =='cancelled' %}selected{% endif %}>Отменен</option>
-                                                    </select>
-                                                </div>
-                                                <div class="d-grid">
-                                                    <button type="submit" class="btn btn-primary">Обновить статус</button>
-                                                </div>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Delete Transaction Modal -->
-                            <div class="modal fade" id="deleteTransactionModal{{ transaction.id }}" tabindex="-1" aria-hidden="true">
-                                <div class="modal-dialog">
-                                    <div class="modal-content">
-                                        <div class="modal-header">
-                                            <h5 class="modal-title">Подтверждение удаления</h5>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                        </div>
-                                        <div class="modal-body">
-                                            <p>Вы уверены, что хотите удалить заказ <strong>{{ transaction.transaction_id }}</strong>?</p>
-                                            <p class="text-danger">Это действие нельзя отменить.</p>
-                                        </div>
-                                        <div class="modal-footer">
-                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                                            <form method="POST" action="{{ url_for('admin_delete_transaction') }}">
-                                                <input type="hidden" name="transaction_id" value="{{ transaction.id }}">
-                                                <button type="submit" class="btn btn-danger">Удалить</button>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -143,4 +70,102 @@
         </div>
     </div>
 </div>
+
+<!-- Модальные окна для транзакций -->
+{% for transaction in transactions %}
+<!-- View Transaction Modal -->
+<div class="modal fade" id="viewTransactionModal{{ transaction.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Детали заказа</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <h6>Информация о заказе</h6>
+                    <p><strong>ID транзакции:</strong> {{ transaction.transaction_id }}</p>
+                    <p><strong>Дата:</strong> {{ transaction.transaction_date.strftime('%Y-%m-%d %H:%M') }}</p>
+                    <p><strong>Статус:</strong>
+                        {% if transaction.status == 'completed' %}
+                        <span class="badge bg-success">Выполнен</span>
+                        {% elif transaction.status == 'pending' %}
+                        <span class="badge bg-warning">В ожидании</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ transaction.status }}</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="mb-3">
+                    <h6>Информация о пользователе</h6>
+                    <p><strong>Пользователь:</strong> {{ users[transaction.user_id] }}</p>
+                    <p><strong>ID пользователя:</strong> {{ transaction.user_id }}</p>
+                </div>
+                <div class="mb-3">
+                    <h6>Информация о товаре</h6>
+                    <p><strong>Товар:</strong> {{ products[transaction.product_id] }}</p>
+                    <p><strong>Количество:</strong> {{ transaction.quantity }}</p>
+                    <p><strong>Сумма:</strong> {{ transaction.total_price }} Credits</p>
+                </div>
+
+                <form method="POST" action="{{ url_for('admin_update_transaction_status') }}">
+                    <input type="hidden" name="transaction_id" value="{{ transaction.id }}">
+                    <div class="mb-3">
+                        <label for="status" class="form-label">Изменить статус</label>
+                        <select class="form-select" id="status" name="status">
+                            <option value="pending" {% if transaction.status =='pending' %}selected{% endif %}>В ожидании</option>
+                            <option value="completed" {% if transaction.status =='completed' %}selected{% endif %}>Выполнен</option>
+                            <option value="cancelled" {% if transaction.status =='cancelled' %}selected{% endif %}>Отменен</option>
+                        </select>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Обновить статус</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Transaction Modal -->
+<div class="modal fade" id="deleteTransactionModal{{ transaction.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Подтверждение удаления</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы уверены, что хотите удалить заказ <strong>{{ transaction.transaction_id }}</strong>?</p>
+                <p class="text-danger">Это действие нельзя отменить.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <form method="POST" action="{{ url_for('admin_delete_transaction') }}">
+                    <input type="hidden" name="transaction_id" value="{{ transaction.id }}">
+                    <button type="submit" class="btn btn-danger">Удалить</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Инициализация модальных окон для транзакций
+    var transactionModals = document.querySelectorAll('.modal');
+    transactionModals.forEach(function(modal) {
+        modal.addEventListener('shown.bs.modal', function() {
+            var input = modal.querySelector('input, textarea, select');
+            if (input) {
+                input.focus();
+            }
+        });
+    });
+});
+</script>
 {% endblock %}
