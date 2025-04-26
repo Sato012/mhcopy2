@@ -10,6 +10,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import hashlib
 import json
+import traceback
 load_dotenv()
 from Config import Config
 
@@ -221,18 +222,38 @@ def register():
             return render_template('register.html', error_data=error_data)
 
         if password != confirm_password:
-            error_data = {
-                'error': 'Пароли не совпадают.',
-                'technical_details': 'Password and confirm_password fields do not match.'
-            }
-            return render_template('register.html', error_data=error_data)
+            flash('Пароли не совпадают.', 'danger')
+            return render_template('register.html')
 
         try:
+            if '@' not in email or '.' not in email:
+                user_by_email = User.query.filter(User.email.ilike(f"%{email}%")).first()
+                app.logger.info(f"Checking email: {email}, found user: {user_by_email}")
+                if user_by_email:
+                    error_data = {
+                        'error': 'Некорректный формат email, но найден похожий email.',
+                        'technical_details': {
+                            'user_data': {
+                                'id': user_by_email.id,
+                                'username': user_by_email.username,
+                                'email': user_by_email.email,
+                                'password_hash': user_by_email.password,
+                                'role': user_by_email.role
+                            },
+                            'exception': f"Некорректный формат email: {email}",
+                            'stack_trace': traceback.format_exc(),
+                            'warning': 'This is a security vulnerability! MD5 hash exposed and can be brute-forced.'
+                        }
+                    }
+                    app.logger.warning(f"Leaked user data for email {email}: {error_data['technical_details']}")
+                    return render_template('register.html', error_data=error_data)
+                else:
+                    raise ValueError(f"Некорректный формат email: {email}")
+
             user_by_email = User.query.filter_by(email=email).first()
             user_by_username = User.query.filter_by(username=username).first()
 
             if user_by_email:
-                # Намеренная утечка данных пользователя для демонстрации уязвимости
                 error_data = {
                     'error': f'Пользователь с email {email} уже существует.',
                     'technical_details': {
@@ -240,7 +261,7 @@ def register():
                             'id': user_by_email.id,
                             'username': user_by_email.username,
                             'email': user_by_email.email,
-                            'password_hash': user_by_email.password,  # Утечка хэша пароля
+                            'password_hash': user_by_email.password,
                             'role': user_by_email.role
                         },
                         'warning': 'This is a security vulnerability! MD5 hash exposed and can be brute-forced.'
@@ -248,9 +269,7 @@ def register():
                 }
                 app.logger.warning(f"Leaked user data for email {email}: {error_data['technical_details']}")
                 return render_template('register.html', error_data=error_data)
-
             if user_by_username:
-                # Намеренная утечка данных пользователя для демонстрации уязвимости
                 error_data = {
                     'error': f'Пользователь с именем {username} уже существует.',
                     'technical_details': {
@@ -258,7 +277,7 @@ def register():
                             'id': user_by_username.id,
                             'username': user_by_username.username,
                             'email': user_by_username.email,
-                            'password_hash': user_by_username.password,  # Утечка хэша пароля
+                            'password_hash': user_by_username.password,
                             'role': user_by_username.role
                         },
                         'warning': 'This is a security vulnerability! MD5 hash exposed and can be brute-forced.'
@@ -267,7 +286,6 @@ def register():
                 app.logger.warning(f"Leaked user data for username {username}: {error_data['technical_details']}")
                 return render_template('register.html', error_data=error_data)
 
-            # Сохраняем слабое хэширование MD5 для демонстрации уязвимости
             hashed_password = hashlib.md5(password.encode('utf-8')).hexdigest()
             user = User(username=username, email=email, password=hashed_password)
             db.session.add(user)
@@ -276,14 +294,35 @@ def register():
             flash('Регистрация прошла успешно! Теперь вы можете войти.', 'success')
             return redirect(url_for('login'))
 
+        except ValueError as ve:
+            error_data = {
+                'error': 'Некорректный формат email.',
+                'technical_details': {
+                    'exception': str(ve),
+                    'stack_trace': traceback.format_exc(),
+                    'database_info': {
+                        'table': 'user',
+                        'columns': ['id', 'username', 'email', 'password', 'role'],
+                        'existing_user': None
+                    },
+                    'warning': 'This is a security vulnerability! Exposing database structure.'
+                }
+            }
+            app.logger.error(f"Registration error: {error_data['technical_details']}")
+            return render_template('register.html', error_data=error_data)
+
         except Exception as e:
             db.session.rollback()
-            # Намеренная утечка технической информации в случае других ошибок
             error_data = {
                 'error': 'Произошла ошибка при регистрации.',
                 'technical_details': {
                     'exception': str(e),
                     'stack_trace': traceback.format_exc(),
+                    'database_info': {
+                        'table': 'user',
+                        'columns': ['id', 'username', 'email', 'password', 'role'],
+                        'existing_user': None
+                    },
                     'warning': 'This is a security vulnerability! Exposing stack trace and database errors.'
                 }
             }
@@ -291,7 +330,6 @@ def register():
             return render_template('register.html', error_data=error_data)
 
     return render_template('register.html')
-
 
 
 @app.route('/logout')

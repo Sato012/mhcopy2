@@ -1,44 +1,12 @@
-[2025-04-26 13:23:29,436] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 13:23:31,271] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 13:32:43,460] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 13:32:45,201] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 14:40:19,480] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 14:59:50,656] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 14:59:52,356] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 15:00:38,333] WARNING in app_copy1: Leaked user data for email DAD@1.RU: {'user_data': {'id': 2, 'username': 'dad', 'email': 'DAD@1.RU', 'password_hash': '25f91520f22005da43a125ccf41a3a26', 'role': 'astronaut'}, 'warning': 'This is a security vulnerability! MD5 hash exposed and can be brute-forced.'}
-[2025-04-26 15:19:02,715] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 15:19:04,549] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 15:19:28,488] WARNING in app_copy1: Leaked user data for email DAD@1.RU: {'user_data': {'id': 2, 'username': 'dad', 'email': 'DAD@1.RU', 'password_hash': '25f91520f22005da43a125ccf41a3a26', 'role': 'astronaut'}, 'warning': 'This is a security vulnerability! MD5 hash exposed and can be brute-forced.'}
-[2025-04-26 15:28:21,152] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 15:28:22,943] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 15:28:49,735] WARNING in app_copy1: Leaked user data for username admin: {'user_data': {'id': 1, 'username': 'admin', 'email': 'admin@marslife.com', 'password_hash': '0192023a7bbd73250516f069df18b500', 'role': 'admin'}, 'warning': 'This is a security vulnerability! MD5 hash exposed and can be brute-forced.'}
-[2025-04-26 15:32:31,430] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 15:32:33,243] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 15:32:58,507] WARNING in app_copy1: Leaked user data for username admin: {'user_data': {'id': 1, 'username': 'admin', 'email': 'admin@marslife.com', 'password_hash': '0192023a7bbd73250516f069df18b500', 'role': 'admin'}, 'warning': 'This is a security vulnerability! MD5 hash exposed and can be brute-forced.'}
-[2025-04-26 15:34:30,485] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 15:34:32,185] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 15:36:26,219] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 15:36:43,275] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 15:36:45,077] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 15:36:52,180] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 15:36:53,975] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 15:37:15,173] WARNING in app_copy1: Leaked user data for username admin: {'user_data': {'id': 1, 'username': 'admin', 'email': 'admin@marslife.com', 'password_hash': '0192023a7bbd73250516f069df18b500', 'role': 'admin'}, 'warning': 'This is a security vulnerability! MD5 hash exposed and can be brute-forced.'}
-[2025-04-26 15:39:22,633] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 15:39:24,366] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 15:40:46,620] WARNING in app_copy1: Leaked user data for email DAD@1.RU: {'user_data': {'id': 2, 'username': 'dad', 'email': 'DAD@1.RU', 'password_hash': '25f91520f22005da43a125ccf41a3a26', 'role': 'astronaut'}, 'warning': 'This is a security vulnerability! MD5 hash exposed and can be brute-forced.'}
-[2025-04-26 15:43:34,880] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 15:43:36,671] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 15:44:16,676] WARNING in app_copy1: Leaked user data for username admin: {'user_data': {'id': 1, 'username': 'admin', 'email': 'admin@marslife.com', 'password_hash': '0192023a7bbd73250516f069df18b500', 'role': 'admin'}, 'warning': 'This is a security vulnerability! MD5 hash exposed and can be brute-forced.'}
-[2025-04-26 16:03:29,905] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 16:03:35,666] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 16:05:20,349] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 16:05:21,999] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 16:05:40,976] WARNING in app_copy1: Leaked user data for username admin: {'user_data': {'id': 1, 'username': 'admin', 'email': 'admin@marslife.com', 'password_hash': '0192023a7bbd73250516f069df18b500', 'role': 'admin'}, 'warning': 'This is a security vulnerability! MD5 hash exposed and can be brute-forced.'}
-[2025-04-26 16:38:52,214] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 16:38:54,061] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 16:39:28,505] WARNING in app_copy1: Leaked user data for username dad: {'user_data': {'id': 2, 'username': 'dad', 'email': 'DAD@1.RU', 'password_hash': '25f91520f22005da43a125ccf41a3a26', 'role': 'astronaut'}}
-[2025-04-26 16:40:12,969] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 16:40:14,750] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 16:40:29,331] WARNING in app_copy1: Leaked user data for username admin: {'user_data': {'id': 1, 'username': 'admin', 'email': 'admin@marslife.com', 'password_hash': '0192023a7bbd73250516f069df18b500', 'role': 'admin'}, 'warning': 'This is a security vulnerability! MD5 hash exposed and can be brute-forced.'}
-[2025-04-26 16:41:25,400] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 16:41:27,230] INFO in app_copy1: === MarsLifeHub запущен ===
+[2025-04-26 22:47:04,868] INFO in app_copy1: === MarsLifeHub запущен ===
+[2025-04-26 22:47:06,599] INFO in app_copy1: === MarsLifeHub запущен ===
+[2025-04-26 22:47:43,742] INFO in app_copy1: Checking email: dad@s, found user: None
+[2025-04-26 22:47:43,745] ERROR in app_copy1: Registration error: {'exception': 'Некорректный формат email: dad@s', 'stack_trace': 'Traceback (most recent call last):\n  File "C:\\Users\\1\\OneDrive\\Документы\\mhcopy2\\app_copy1.py", line 252, in register\n    raise ValueError(f"Некорректный формат email: {email}")\nValueError: Некорректный формат email: dad@s\n', 'database_info': {'table': 'user', 'columns': ['id', 'username', 'email', 'password', 'role'], 'existing_user': None}, 'warning': 'This is a security vulnerability! Exposing database structure.'}
+[2025-04-26 22:48:10,345] WARNING in app_copy1: Leaked user data for username admi: {'user_data': {'id': 9, 'username': 'admi', 'email': 'dad@i.t', 'password_hash': '202cb962ac59075b964b07152d234b70', 'role': 'astronaut'}, 'warning': 'This is a security vulnerability! MD5 hash exposed and can be brute-forced.'}
+[2025-04-26 22:48:38,678] WARNING in app_copy1: Leaked user data for email dad@i.t: {'user_data': {'id': 9, 'username': 'admi', 'email': 'dad@i.t', 'password_hash': '202cb962ac59075b964b07152d234b70', 'role': 'astronaut'}, 'warning': 'This is a security vulnerability! MD5 hash exposed and can be brute-forced.'}
+[2025-04-26 22:50:12,085] INFO in app_copy1: === MarsLifeHub запущен ===
+[2025-04-26 22:50:42,720] INFO in app_copy1: === MarsLifeHub запущен ===
+[2025-04-26 22:53:16,556] INFO in app_copy1: === MarsLifeHub запущен ===
+[2025-04-26 22:53:18,436] INFO in app_copy1: === MarsLifeHub запущен ===
+[2025-04-26 22:53:33,735] INFO in app_copy1: Checking email: fa@u, found user: None
+[2025-04-26 22:53:33,739] ERROR in app_copy1: Registration error: {'exception': 'Некорректный формат email: fa@u', 'stack_trace': 'Traceback (most recent call last):\n  File "C:\\Users\\1\\OneDrive\\Документы\\mhcopy2\\app_copy1.py", line 251, in register\n    raise ValueError(f"Некорректный формат email: {email}")\nValueError: Некорректный формат email: fa@u\n', 'database_info': {'table': 'user', 'columns': ['id', 'username', 'email', 'password', 'role'], 'existing_user': None}, 'warning': 'This is a security vulnerability! Exposing database structure.'}
