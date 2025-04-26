@@ -1,6 +1,6 @@
 .env
-*.py
-docker-compose.yml
-Dockerfile
-requirements.txt
-Config.cpython-313.pyc
+ *.py
+ docker-compose.yml
+ Dockerfile
+ requirements.txt
+ Config.cpython-313.pyc

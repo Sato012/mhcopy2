@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 import os
 import uuid
@@ -9,6 +9,7 @@ from sqlalchemy.sql import text
 import logging
 from logging.handlers import RotatingFileHandler
 import hashlib
+import json
 load_dotenv()
 from Config import Config
 
@@ -204,32 +205,93 @@ def login():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    if 'user_id' in session:
+        return redirect(url_for('home'))
     if request.method == 'POST':
         username = request.form.get('username')
         email = request.form.get('email')
         password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
 
-        existing_user = User.query.filter_by(username=username).first()
-        existing_email = User.query.filter_by(email=email).first()
+        if not all([username, email, password, confirm_password]):
+            error_data = {
+                'error': 'Все поля обязательны для заполнения.',
+                'technical_details': 'Missing required fields in form submission.'
+            }
+            return render_template('register.html', error_data=error_data)
 
-        if existing_user:
-            app.logger.warning(f'Попытка регистрации с существующим username: {username}, ip={request.remote_addr}')
-            flash('Данный пользователь уже зарегистрирован', 'danger')
-        elif existing_email:
-            app.logger.warning(f'Попытка регистрации с существующим email: {email}, ip={request.remote_addr}')
-            flash('Почта уже зарегистрирована', 'danger')
-        else:
+        if password != confirm_password:
+            error_data = {
+                'error': 'Пароли не совпадают.',
+                'technical_details': 'Password and confirm_password fields do not match.'
+            }
+            return render_template('register.html', error_data=error_data)
+
+        try:
+            user_by_email = User.query.filter_by(email=email).first()
+            user_by_username = User.query.filter_by(username=username).first()
+
+            if user_by_email:
+                # Намеренная утечка данных пользователя для демонстрации уязвимости
+                error_data = {
+                    'error': f'Пользователь с email {email} уже существует.',
+                    'technical_details': {
+                        'user_data': {
+                            'id': user_by_email.id,
+                            'username': user_by_email.username,
+                            'email': user_by_email.email,
+                            'password_hash': user_by_email.password,  # Утечка хэша пароля
+                            'role': user_by_email.role
+                        },
+                        'warning': 'This is a security vulnerability! MD5 hash exposed and can be brute-forced.'
+                    }
+                }
+                app.logger.warning(f"Leaked user data for email {email}: {error_data['technical_details']}")
+                return render_template('register.html', error_data=error_data)
+
+            if user_by_username:
+                # Намеренная утечка данных пользователя для демонстрации уязвимости
+                error_data = {
+                    'error': f'Пользователь с именем {username} уже существует.',
+                    'technical_details': {
+                        'user_data': {
+                            'id': user_by_username.id,
+                            'username': user_by_username.username,
+                            'email': user_by_username.email,
+                            'password_hash': user_by_username.password,  # Утечка хэша пароля
+                            'role': user_by_username.role
+                        },
+                        'warning': 'This is a security vulnerability! MD5 hash exposed and can be brute-forced.'
+                    }
+                }
+                app.logger.warning(f"Leaked user data for username {username}: {error_data['technical_details']}")
+                return render_template('register.html', error_data=error_data)
+
+            # Сохраняем слабое хэширование MD5 для демонстрации уязвимости
             hashed_password = hashlib.md5(password.encode('utf-8')).hexdigest()
-            new_user = User(username=username, email=email, password=hashed_password)
-            db.session.add(new_user)
+            user = User(username=username, email=email, password=hashed_password)
+            db.session.add(user)
             db.session.commit()
 
-            app.logger.info(
-                f'Новый пользователь зарегистрирован: username="{username}", email="{email}", ip={request.remote_addr}')
-            flash('Регистрация прошла успешно! Войти', 'success')
+            flash('Регистрация прошла успешно! Теперь вы можете войти.', 'success')
             return redirect(url_for('login'))
 
+        except Exception as e:
+            db.session.rollback()
+            # Намеренная утечка технической информации в случае других ошибок
+            error_data = {
+                'error': 'Произошла ошибка при регистрации.',
+                'technical_details': {
+                    'exception': str(e),
+                    'stack_trace': traceback.format_exc(),
+                    'warning': 'This is a security vulnerability! Exposing stack trace and database errors.'
+                }
+            }
+            app.logger.error(f"Registration error: {error_data['technical_details']}")
+            return render_template('register.html', error_data=error_data)
+
     return render_template('register.html')
+
 
 
 @app.route('/logout')
