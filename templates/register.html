@@ -14,7 +14,7 @@
                     <div class="alert alert-warning" role="alert">
                         <h5>{{ error_data.error }}</h5>
                         <div class="mt-2">
-                            <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#technicalDetails" aria-expanded="false" aria-controls="technicalDetails" {% if error_data.error == "Пароли не совпадают." %}disabled{% endif %}>
+                            <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#technicalDetails" aria-expanded="false" aria-controls="technicalDetails" {% if error_data.error == "Пароли не совпадают." or error_data.error == "Некорректный формат email." %}disabled{% endif %}>
                                 Техническая информация
                             </button>
                             <div class="collapse mt-2" id="technicalDetails">

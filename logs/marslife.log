@@ -42,13 +42,3 @@
 [2025-04-26 16:40:29,331] WARNING in app_copy1: Leaked user data for username admin: {'user_data': {'id': 1, 'username': 'admin', 'email': 'admin@marslife.com', 'password_hash': '0192023a7bbd73250516f069df18b500', 'role': 'admin'}, 'warning': 'This is a security vulnerability! MD5 hash exposed and can be brute-forced.'}
 [2025-04-26 16:41:25,400] INFO in app_copy1: === MarsLifeHub запущен ===
 [2025-04-26 16:41:27,230] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 21:45:01,723] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 21:45:02,955] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 21:49:16,702] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 21:49:17,955] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 21:57:57,267] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 22:03:19,818] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 22:03:20,579] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-26 22:14:32,913] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-27 02:33:58,822] INFO in app_copy1: === MarsLifeHub запущен ===
-[2025-04-27 02:34:00,057] INFO in app_copy1: === MarsLifeHub запущен ===
