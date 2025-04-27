@@ -16,10 +16,9 @@ load_dotenv()
 from Config import Config
 
 app = Flask(__name__)
-
 app.config.from_object(Config)
-
 db = SQLAlchemy(app)
+
 
 def setup_logging():
     if not os.path.exists('logs'):
@@ -27,7 +26,7 @@ def setup_logging():
 
     file_handler = RotatingFileHandler(
         'logs/marslife.log',
-        maxBytes=10240,  # 10KB
+        maxBytes=10240,
         backupCount=10,
         encoding='utf-8'
     )
@@ -40,7 +39,9 @@ def setup_logging():
     app.logger.setLevel(logging.INFO)
     app.logger.info('=== MarsLifeHub запущен ===')
 
+
 setup_logging()
+
 
 # Database Models
 class User(db.Model):
@@ -50,6 +51,7 @@ class User(db.Model):
     password = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(200), default='astronaut')
 
+
 class Resource(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False)
@@ -58,6 +60,7 @@ class Resource(db.Model):
     unit = db.Column(db.String(20), nullable=False)
     last_updated = db.Column(db.DateTime, default=datetime.utcnow)
 
+
 class EnvironmentControl(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     parameter = db.Column(db.String(50), nullable=False)
@@ -65,6 +68,7 @@ class EnvironmentControl(db.Model):
     min_value = db.Column(db.Float, nullable=False)
     max_value = db.Column(db.Float, nullable=False)
     unit = db.Column(db.String(20), nullable=False)
+
 
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -79,6 +83,7 @@ class Product(db.Model):
     def is_available(self):
         return self.stock > 0
 
+
 class Transaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -91,7 +96,42 @@ class Transaction(db.Model):
     payment_method = db.Column(db.String(20))
     card_number = db.Column(db.String(50))
 
-# Маршруты
+
+# Helper functions
+def get_env_controls():
+    controls = EnvironmentControl.query.all()
+    return [{
+        'id': c.id,
+        'parameter': c.parameter,
+        'current_value': c.current_value,
+        'min_value': c.min_value,
+        'max_value': c.max_value,
+        'unit': c.unit
+    } for c in controls]
+
+
+def get_resources():
+    resources = Resource.query.all()
+    return [{
+        'name': r.name,
+        'current': r.current_level,
+        'max': r.max_level,
+        'unit': r.unit,
+        'icon': get_icon_for_resource(r.name)
+    } for r in resources]
+
+
+def get_icon_for_resource(resource_name):
+    icons = {
+        'Кислород': 'wind',
+        'Вода': 'droplet',
+        'Электроэнергия': 'zap',
+        'Еда': 'coffee'
+    }
+    return icons.get(resource_name, 'help-circle')
+
+
+# Routes
 @app.route('/')
 def index():
     if 'user_id' not in session:
@@ -99,6 +139,7 @@ def index():
     resources_data = get_resources()
     env_controls = get_env_controls()
     return render_template('index.html', resources=resources_data, env_controls=env_controls)
+
 
 @app.route('/admin')
 def admin_dashboard():
@@ -118,6 +159,7 @@ def admin_dashboard():
                            products_count=products_count,
                            resources=resources)
 
+
 @app.route('/admin/users')
 def admin_users():
     if 'user_id' not in session:
@@ -128,6 +170,7 @@ def admin_users():
         return redirect(url_for('index'))
     users = User.query.all()
     return render_template('admin/users.html', users=users)
+
 
 @app.route('/admin/transactions')
 def admin_transactions():
@@ -145,12 +188,12 @@ def admin_transactions():
                            users=users,
                            products=products)
 
+
 @app.route('/admin/transactions/update_status', methods=['POST'])
 def admin_update_transaction_status():
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
-    # Проверяем, является ли пользователь администратором
     admin_user = User.query.get(session['user_id'])
     if not admin_user or admin_user.role != 'admin':
         flash('У вас нет доступа к админской панели', 'danger')
@@ -177,6 +220,7 @@ def admin_update_transaction_status():
 
     return redirect(url_for('admin_transactions'))
 
+
 @app.route('/admin/products')
 def admin_products():
     if 'user_id' not in session:
@@ -187,6 +231,7 @@ def admin_products():
         return redirect(url_for('index'))
     products = Product.query.all()
     return render_template('admin/products.html', products=products)
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -204,6 +249,7 @@ def login():
         else:
             flash('Invalid username or password', 'danger')
     return render_template('login.html')
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -234,7 +280,6 @@ def register():
             user_by_username = User.query.filter_by(username=username).first()
 
             if user_by_email:
-                # Намеренная утечка данных пользователя для демонстрации уязвимости
                 error_data = {
                     'error': f'Пользователь с email {email} уже существует.',
                     'technical_details': {
@@ -242,7 +287,7 @@ def register():
                             'id': user_by_email.id,
                             'username': user_by_email.username,
                             'email': user_by_email.email,
-                            'password_hash': user_by_email.password,  # Утечка хэша пароля
+                            'password_hash': user_by_email.password,
                             'role': user_by_email.role
                         },
                         'warning': 'This is a security vulnerability! MD5 hash exposed and can be brute-forced.'
@@ -252,7 +297,6 @@ def register():
                 return render_template('register.html', error_data=error_data)
 
             if user_by_username:
-                # Намеренная утечка данных пользователя для демонстрации уязвимости
                 error_data = {
                     'error': f'Пользователь с именем {username} уже существует.',
                     'technical_details': {
@@ -260,7 +304,7 @@ def register():
                             'id': user_by_username.id,
                             'username': user_by_username.username,
                             'email': user_by_username.email,
-                            'password_hash': user_by_username.password,  # Утечка хэша пароля
+                            'password_hash': user_by_username.password,
                             'role': user_by_username.role
                         },
                         'warning': 'This is a security vulnerability! MD5 hash exposed and can be brute-forced.'
@@ -269,7 +313,6 @@ def register():
                 app.logger.warning(f"Leaked user data for username {username}: {error_data['technical_details']}")
                 return render_template('register.html', error_data=error_data)
 
-            # Сохраняем слабое хэширование MD5 для демонстрации уязвимости
             hashed_password = hashlib.md5(password.encode('utf-8')).hexdigest()
             user = User(username=username, email=email, password=hashed_password)
             db.session.add(user)
@@ -280,7 +323,6 @@ def register():
 
         except Exception as e:
             db.session.rollback()
-            # Намеренная утечка технической информации в случае других ошибок
             error_data = {
                 'error': 'Произошла ошибка при регистрации.',
                 'technical_details': {
@@ -295,13 +337,13 @@ def register():
     return render_template('register.html')
 
 
-
 @app.route('/logout')
 def logout():
     session.pop('user_id', None)
     session.pop('username', None)
-    flash('You have been logged out If you have been logged out, you can log in again.', 'info')
+    flash('You have been logged out. If you have been logged out, you can log in again.', 'info')
     return redirect(url_for('login'))
+
 
 @app.route('/admin/users/delete', methods=['POST'])
 def admin_delete_user():
@@ -332,6 +374,7 @@ def admin_delete_user():
         flash('Пользователь не найден', 'danger')
     return redirect(url_for('admin_users'))
 
+
 @app.route('/admin/transactions/delete', methods=['POST'])
 def admin_delete_transaction():
     if 'user_id' not in session:
@@ -361,6 +404,7 @@ def admin_delete_transaction():
         flash('Транзакция не найдена', 'danger')
     return redirect(url_for('admin_transactions'))
 
+
 @app.route('/admin/products/delete', methods=['POST'])
 def admin_delete_product():
     if 'user_id' not in session:
@@ -389,6 +433,7 @@ def admin_delete_product():
     else:
         flash('Товар не найден', 'danger')
     return redirect(url_for('admin_products'))
+
 
 @app.route('/admin/products/add', methods=['POST'])
 def admin_add_product():
@@ -423,6 +468,7 @@ def admin_add_product():
         db.session.rollback()
         flash(f'Ошибка при добавлении товара: {str(e)}', 'danger')
     return redirect(url_for('admin_products'))
+
 
 @app.route('/admin/products/edit', methods=['POST'])
 def admin_edit_product():
@@ -460,6 +506,7 @@ def admin_edit_product():
         flash(f'Ошибка при обновлении товара: {str(e)}', 'danger')
     return redirect(url_for('admin_products'))
 
+
 @app.route('/admin/users/add', methods=['POST'])
 def admin_add_user():
     if 'user_id' not in session:
@@ -493,7 +540,8 @@ def admin_add_user():
     except Exception as e:
         db.session.rollback()
         flash(f'Ошибка при добавлении пользователя: {str(e)}', 'danger')
-        return redirect(url_for('admin_users'))
+    return redirect(url_for('admin_users'))
+
 
 @app.route('/admin/users/edit', methods=['POST'])
 def admin_edit_user():
@@ -524,29 +572,6 @@ def admin_edit_user():
         flash(f'Ошибка при обновлении пользователя: {str(e)}', 'danger')
     return redirect(url_for('admin_users'))
 
-def get_env_controls():
-    if 'env_controls' in session:
-        return session['env_controls']
-    default_controls = [
-        {'id': 1, 'parameter': 'Температура', 'current_value': 22.5, 'min_value': 18.0, 'max_value': 26.0, 'unit': '°C'},
-        {'id': 2, 'parameter': 'Влажность', 'current_value': 45.0, 'min_value': 30.0, 'max_value': 60.0, 'unit': '%'},
-        {'id': 3, 'parameter': 'Давление', 'current_value': 101.3, 'min_value': 98.0, 'max_value': 102.5, 'unit': 'кПа'},
-        {'id': 4, 'parameter': 'Уровень CO2', 'current_value': 0.04, 'min_value': 0.03, 'max_value': 0.06, 'unit': '%'},
-    ]
-    session['env_controls'] = default_controls
-    return default_controls
-
-def get_resources():
-    if 'resources' in session:
-        return session['resources']
-    default_resources = [
-        {'name': 'Кислород', 'current': 85, 'max': 100, 'unit': '%', 'icon': 'wind'},
-        {'name': 'Вода', 'current': 2500, 'max': 5000, 'unit': 'л', 'icon': 'droplet'},
-        {'name': 'Электроэнергия', 'current': 75, 'max': 100, 'unit': 'кВт', 'icon': 'zap'},
-        {'name': 'Еда', 'current': 1200, 'max': 2000, 'unit': 'кг', 'icon': 'coffee'},
-    ]
-    session['resources'] = default_resources
-    return default_resources
 
 @app.route('/resources')
 def resources():
@@ -555,12 +580,14 @@ def resources():
     resources_data = get_resources()
     return render_template('resources.html', resources=resources_data)
 
+
 @app.route('/environment')
 def environment():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     env_controls = get_env_controls()
     return render_template('environment.html', env_controls=env_controls)
+
 
 @app.route('/environment/debug')
 def environment_debug():
@@ -569,23 +596,26 @@ def environment_debug():
     env_controls = get_env_controls()
     return render_template('environment_debug.html', env_controls=env_controls)
 
+
 @app.route('/update_environment', methods=['POST'])
 def update_environment():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     param_id = int(request.form.get('param_id'))
     new_value = float(request.form.get('new_value'))
-    env_controls = get_env_controls()
-    for control in env_controls:
-        if control['id'] == param_id:
-            if control['min_value'] <= new_value <= control['max_value']:
-                control['current_value'] = new_value
-                flash(f'Параметр "{control["parameter"]}" обновлен до {new_value} {control["unit"]}', 'success')
-            else:
-                flash(f'Значение должно быть в диапазоне от {control["min_value"]} до {control["max_value"]} {control["unit"]}', 'danger')
-            break
-    session['env_controls'] = env_controls
+    control = EnvironmentControl.query.get(param_id)
+    if control:
+        if control.min_value <= new_value <= control.max_value:
+            control.current_value = new_value
+            db.session.commit()
+            flash(f'Параметр "{control.parameter}" обновлен до {new_value} {control.unit}', 'success')
+        else:
+            flash(f'Значение должно быть в диапазоне от {control.min_value} до {control.max_value} {control.unit}',
+                  'danger')
+    else:
+        flash('Параметр не найден', 'danger')
     return redirect(url_for('environment'))
+
 
 @app.route('/update_resource', methods=['POST'])
 def update_resource():
@@ -594,25 +624,27 @@ def update_resource():
     resource_name = request.form.get('resource_name')
     action = request.form.get('action')
     amount = int(request.form.get('amount'))
-    resources_data = get_resources()
-    for resource in resources_data:
-        if resource['name'] == resource_name:
-            if action == 'increase':
-                new_value = resource['current'] + amount
-                if new_value <= resource['max']:
-                    resource['current'] = new_value
-                    flash(f'Ресурс "{resource["name"]}" увеличен на {amount} {resource["unit"]}', 'success')
-                else:
-                    flash(f'Невозможно увеличить "{resource["name"]}" выше максимума {resource["max"]} {resource["unit"]}', 'danger')
-            elif action == 'decrease':
-                new_value = resource['current'] - amount
-                if new_value >= 0:
-                    resource['current'] = new_value
-                    flash(f'Ресурс "{resource["name"]}" уменьшен на {amount} {resource["unit"]}', 'success')
-                else:
-                    flash(f'Невозможно уменьшить "{resource["name"]}" ниже 0 {resource["unit"]}', 'danger')
-            break
-    session['resources'] = resources_data
+    resource = Resource.query.filter_by(name=resource_name).first()
+    if resource:
+        if action == 'increase':
+            new_value = resource.current_level + amount
+            if new_value <= resource.max_level:
+                resource.current_level = new_value
+                db.session.commit()
+                flash(f'Ресурс "{resource.name}" увеличен на {amount} {resource.unit}', 'success')
+            else:
+                flash(f'Невозможно увеличить "{resource.name}" выше максимума {resource.max_level} {resource.unit}',
+                      'danger')
+        elif action == 'decrease':
+            new_value = resource.current_level - amount
+            if new_value >= 0:
+                resource.current_level = new_value
+                db.session.commit()
+                flash(f'Ресурс "{resource.name}" уменьшен на {amount} {resource.unit}', 'success')
+            else:
+                flash(f'Невозможно уменьшить "{resource.name}" ниже 0 {resource.unit}', 'danger')
+    else:
+        flash('Ресурс не найден', 'danger')
     return redirect(url_for('resources'))
 
 
@@ -862,7 +894,7 @@ def store():
 def product_detail(product_id):
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    product = db.session.get(Product, product_id)  # Исправлено для SQLAlchemy 2.0
+    product = db.session.get(Product, product_id)
     if not product:
         flash('Товар не найден', 'danger')
         return redirect(url_for('store'))
@@ -883,7 +915,6 @@ def checkout(product_id):
         try:
             quantity = int(request.form.get('quantity', 1))
 
-            # Добавленная проверка на максимальное количество (3 единицы)
             if quantity > 3:
                 flash('Можно купить не более 3 единиц одного товара за раз', 'danger')
                 return redirect(url_for('checkout', product_id=product_id))
@@ -921,6 +952,7 @@ def checkout(product_id):
 
     return render_template('checkout.html', product=product)
 
+
 @app.route('/payment/<transaction_id>', methods=['GET', 'POST'])
 def payment(transaction_id):
     if 'user_id' not in session:
@@ -937,7 +969,7 @@ def payment(transaction_id):
             transaction.status = 'completed'
             product.stock -= transaction.quantity
             if product.stock == 0:
-                product.stock = 999  # Устанавливаем базовый уровень пополнения
+                product.stock = 999
                 flash(f'Товар "{product.name}" был автоматически пополнен до 999 единиц', 'info')
             db.session.commit()
             flash('Оплата прошла успешно!', 'success')
@@ -947,6 +979,7 @@ def payment(transaction_id):
             flash('Ошибка при обработке платежа', 'danger')
             return redirect(url_for('payment', transaction_id=transaction_id))
     return render_template('payment.html', transaction=transaction, product=product)
+
 
 @app.route('/payment/card/<transaction_id>', methods=['GET', 'POST'])
 def card_payment(transaction_id):
@@ -961,12 +994,13 @@ def card_payment(transaction_id):
         transaction.status = 'completed'
         product.stock -= transaction.quantity
         if product.stock == 0:
-             product.stock = 999  # Устанавливаем базовый уровень пополнения
-             flash(f'Товар "{product.name}" был автоматически пополнен до 999 единиц', 'info')
+            product.stock = 999
+            flash(f'Товар "{product.name}" был автоматически пополнен до 999 единиц', 'info')
         db.session.commit()
         flash('Оплата картой прошла успешно!', 'success')
         return redirect(url_for('payment_success', transaction_id=transaction_id))
     return render_template('card_payment.html', transaction=transaction, product=product)
+
 
 @app.route('/payment/qr/<transaction_id>')
 def qr_payment(transaction_id):
@@ -977,6 +1011,7 @@ def qr_payment(transaction_id):
     qr_data = f"marslife:payment:{transaction_id}:{transaction.total_price}"
     return render_template('qr_payment.html', transaction=transaction, product=product, qr_data=qr_data)
 
+
 @app.route('/payment/success/<transaction_id>')
 def payment_success(transaction_id):
     if 'user_id' not in session:
@@ -984,6 +1019,7 @@ def payment_success(transaction_id):
     transaction = Transaction.query.filter_by(transaction_id=transaction_id).first_or_404()
     product = Product.query.get(transaction.product_id)
     return render_template('payment_success.html', transaction=transaction, product=product)
+
 
 @app.route('/transactions')
 def transactions():
@@ -998,14 +1034,16 @@ def transactions():
         product = Product.query.get(transaction.product_id)
         products[transaction.product_id] = product.name if product else "Неизвестно"
     return render_template('transactions.html',
-                          transactions=user_transactions,
-                          products=products)
+                           transactions=user_transactions,
+                           products=products)
+
 
 def init_db():
     with app.app_context():
         try:
             db.create_all()
             print("Таблицы созданы успешно!")
+
             if User.query.count() == 0:
                 admin_password = hashlib.md5('admin123'.encode('utf-8')).hexdigest()
                 admin = User(username='admin', email='admin@marslife.com',
@@ -1013,6 +1051,7 @@ def init_db():
                 db.session.add(admin)
                 db.session.commit()
                 print("Тестовый пользователь добавлен.")
+
             if Product.query.count() == 0:
                 demo_products = [
                     {'name': 'Кислородный баллон',
@@ -1039,6 +1078,7 @@ def init_db():
                     db.session.add(product)
                 db.session.commit()
                 print("Демо-товары добавлены.")
+
             if Resource.query.count() == 0:
                 resources = [
                     Resource(name='Кислород', current_level=85.5, max_level=100.0, unit='%'),
@@ -1049,12 +1089,17 @@ def init_db():
                 db.session.add_all(resources)
                 db.session.commit()
                 print("Ресурсы добавлены.")
+
             if EnvironmentControl.query.count() == 0:
                 env_controls = [
-                    EnvironmentControl(parameter='Температура', current_value=22.5, min_value=18.0, max_value=25.0, unit='°C'),
-                    EnvironmentControl(parameter='Влажность', current_value=45.0, min_value=30.0, max_value=60.0, unit='%'),
-                    EnvironmentControl(parameter='Уровень CO2', current_value=0.04, min_value=0.03, max_value=0.1, unit='%'),
-                    EnvironmentControl(parameter='Давление', current_value=101.3, min_value=97.0, max_value=103.0, unit='кПа')
+                    EnvironmentControl(parameter='Температура', current_value=22.5, min_value=18.0, max_value=25.0,
+                                       unit='°C'),
+                    EnvironmentControl(parameter='Влажность', current_value=45.0, min_value=30.0, max_value=60.0,
+                                       unit='%'),
+                    EnvironmentControl(parameter='Уровень CO2', current_value=0.04, min_value=0.03, max_value=0.1,
+                                       unit='%'),
+                    EnvironmentControl(parameter='Давление', current_value=101.3, min_value=97.0, max_value=103.0,
+                                       unit='кПа')
                 ]
                 db.session.add_all(env_controls)
                 db.session.commit()
@@ -1063,8 +1108,7 @@ def init_db():
             db.session.rollback()
             print(f"Ошибка при создании БД: {e}")
 
+
 if __name__ == '__main__':
     init_db()
     app.run(port=5001, debug=True)
-
-print("Flask application structure created successfully!")
