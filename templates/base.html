@@ -21,6 +21,13 @@
         .nav-icon-login { color: #f1c40f; }       /* Желтый */
         .nav-icon-register { color: #e84393; }    /* Розовый */
         .nav-icon-rocket { color: #e74c3c; }      /* Красный (логотип) */
+
+        /* Стили для отображения ID пользователя */
+        .user-id {
+            font-size: 0.8em;
+            opacity: 0.7;
+            margin-left: 5px;
+        }
     </style>
 </head>
 <body>
@@ -66,7 +73,9 @@
                     {% if 'user_id' in session %}
                     <li class="nav-item">
                         <span class="nav-link text-light">
-                            <i class="fas fa-user-astronaut nav-icon-user me-1"></i>{{ session['username'] }}
+                            <i class="fas fa-user-astronaut nav-icon-user me-1"></i>
+                            {{ session['username'] }}
+                            <span class="user-id">/ {{ session['user_id'] }}</span>
                         </span>
                     </li>
                     {% if session.get('is_admin') or (user and user.role == 'admin') %}

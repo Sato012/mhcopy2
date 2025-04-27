@@ -28,6 +28,8 @@
                                 <th>Сумма</th>
                                 <th>Дата</th>
                                 <th>Статус</th>
+                                <th>Способ оплаты</th>
+                                <th>Номер карты</th>
                                 <th>Действия</th>
                             </tr>
                         </thead>
@@ -47,6 +49,22 @@
                                     <span class="badge bg-warning">В ожидании</span>
                                     {% else %}
                                     <span class="badge bg-secondary">{{ transaction.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if transaction.payment_method == 'card' %}
+                                    <span class="badge bg-primary">Карта</span>
+                                    {% elif transaction.payment_method == 'qr' %}
+                                    <span class="badge bg-info">QR-код</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">{{ transaction.payment_method or 'QR' }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if transaction.card_number %}
+                                    {{ transaction.card_number }}
+                                    {% else %}
+                                    —
                                     {% endif %}
                                 </td>
                                 <td>
@@ -95,6 +113,18 @@
                         <span class="badge bg-secondary">{{ transaction.status }}</span>
                         {% endif %}
                     </p>
+                    <p><strong>Способ оплаты:</strong>
+                        {% if transaction.payment_method == 'card' %}
+                        <span class="badge bg-primary">Карта</span>
+                        {% elif transaction.payment_method == 'qr' %}
+                        <span class="badge bg-info">QR-код</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ transaction.payment_method or 'Не указан' }}</span>
+                        {% endif %}
+                    </p>
+                    {% if transaction.card_number %}
+                    <p><strong>Номер карты:</strong> {{ transaction.card_number }}</p>
+                    {% endif %}
                 </div>
                 <div class="mb-3">
                     <h6>Информация о пользователе</h6>
@@ -151,21 +181,4 @@
 </div>
 {% endfor %}
 
-{% endblock %}
-
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Инициализация модальных окон для транзакций
-    var transactionModals = document.querySelectorAll('.modal');
-    transactionModals.forEach(function(modal) {
-        modal.addEventListener('shown.bs.modal', function() {
-            var input = modal.querySelector('input, textarea, select');
-            if (input) {
-                input.focus();
-            }
-        });
-    });
-});
-</script>
 {% endblock %}
