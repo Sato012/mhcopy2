@@ -24,21 +24,30 @@ def setup_logging():
     if not os.path.exists('logs'):
         os.makedirs('logs')
 
+    class JsonFormatter(logging.Formatter):
+        def format(self, record):
+            log_record = {
+                "time": self.formatTime(record, self.datefmt),
+                "level": record.levelname,
+                "module": record.module,
+                "message": record.getMessage(),
+            }
+            if record.exc_info:
+                log_record["exception"] = self.formatException(record.exc_info)
+            return json.dumps(log_record, ensure_ascii=False)
+
     file_handler = RotatingFileHandler(
         'logs/marslife.log',
         maxBytes=10240,
         backupCount=10,
         encoding='utf-8'
     )
-    file_handler.setFormatter(logging.Formatter(
-        '[%(asctime)s] %(levelname)s in %(module)s: %(message)s'
-    ))
+    file_handler.setFormatter(JsonFormatter())
     file_handler.setLevel(logging.INFO)
 
     app.logger.addHandler(file_handler)
     app.logger.setLevel(logging.INFO)
-    app.logger.info('=== MarsLifeHub запущен ===')
-
+    app.logger.info(json.dumps({"event": "application_start", "message": "=== MarsLifeHub запущен ==="}, ensure_ascii=False))
 
 setup_logging()
 
@@ -211,6 +220,13 @@ def admin_update_transaction_status():
         try:
             transaction.status = new_status
             db.session.commit()
+            app.logger.info(json.dumps({
+                "event": "admin_action",
+                "action": "update_transaction_status",
+                "transaction_id": transaction_id,
+                "new_status": new_status
+            }, ensure_ascii=False))
+
             flash('Статус транзакции успешно обновлен', 'success')
         except Exception as e:
             db.session.rollback()
@@ -238,6 +254,10 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
+        app.logger.info(json.dumps({
+            "event": "user_login_attempt",
+            "username": username
+        }, ensure_ascii=False))
         user = User.query.filter_by(username=username).first()
         hashed_password = hashlib.md5(password.encode('utf-8')).hexdigest()
         if user and user.password == hashed_password:
@@ -260,6 +280,11 @@ def register():
         email = request.form.get('email')
         password = request.form.get('password')
         confirm_password = request.form.get('confirm_password')
+        app.logger.info(json.dumps({
+            "event": "user_registration_attempt",
+            "username": username,
+            "email": email
+        }, ensure_ascii=False))
 
         if not all([username, email, password, confirm_password]):
             error_data = {
@@ -323,6 +348,11 @@ def register():
 
         except Exception as e:
             db.session.rollback()
+            app.logger.error(json.dumps({
+                "event": "exception",
+                "location": "register",
+                "error": str(e)
+            }, ensure_ascii=False))
             error_data = {
                 'error': 'Произошла ошибка при регистрации.',
                 'technical_details': {
@@ -339,6 +369,11 @@ def register():
 
 @app.route('/logout')
 def logout():
+    app.logger.info(json.dumps({
+        "event": "user_logout",
+        "user_id": session.get('user_id'),
+        "username": session.get('username')
+    }, ensure_ascii=False))
     session.pop('user_id', None)
     session.pop('username', None)
     flash('You have been logged out. If you have been logged out, you can log in again.', 'info')
@@ -369,6 +404,11 @@ def admin_delete_user():
             flash(f'Пользователь {user.username} успешно удален', 'success')
         except Exception as e:
             db.session.rollback()
+            app.logger.error(json.dumps({
+                "event": "exception",
+                "location": "admin_delete_product",
+                "error": str(e)
+            }, ensure_ascii=False))
             flash(f'Ошибка при удалении пользователя: {str(e)}', 'danger')
     else:
         flash('Пользователь не найден', 'danger')
@@ -396,9 +436,20 @@ def admin_delete_transaction():
                     product.stock += transaction.quantity
             db.session.delete(transaction)
             db.session.commit()
+            app.logger.info(json.dumps({
+                "event": "admin_action",
+                "action": "delete_transaction",
+                "transaction_id": transaction.id
+            }, ensure_ascii=False))
+
             flash('Транзакция успешно удалена', 'success')
         except Exception as e:
             db.session.rollback()
+            app.logger.error(json.dumps({
+                "event": "exception",
+                "location": "admin_delete_transaction",
+                "error": str(e)
+            }, ensure_ascii=False))
             flash(f'Ошибка при удалении транзакции: {str(e)}', 'danger')
     else:
         flash('Транзакция не найдена', 'danger')
@@ -426,9 +477,21 @@ def admin_delete_product():
         try:
             db.session.delete(product)
             db.session.commit()
+            app.logger.info(json.dumps({
+                "event": "admin_action",
+                "action": "delete_product",
+                "product_id": product.id,
+                "product_name": product.name
+            }, ensure_ascii=False))
+
             flash(f'Товар {product.name} успешно удален', 'success')
         except Exception as e:
             db.session.rollback()
+            app.logger.error(json.dumps({
+                "event": "exception",
+                "location": "admin_delete_product",
+                "error": str(e)
+            }, ensure_ascii=False))
             flash(f'Ошибка при удалении товара: {str(e)}', 'danger')
     else:
         flash('Товар не найден', 'danger')
@@ -463,9 +526,22 @@ def admin_add_product():
         )
         db.session.add(new_product)
         db.session.commit()
+        app.logger.info(json.dumps({
+            "event": "admin_action",
+            "action": "add_product",
+            "product_name": name,
+            "price": price,
+            "stock": stock
+        }, ensure_ascii=False))
+
         flash(f'Товар "{name}" успешно добавлен', 'success')
     except Exception as e:
         db.session.rollback()
+        app.logger.error(json.dumps({
+            "event": "exception",
+            "location": "admin_add_product",
+            "error": str(e)
+        }, ensure_ascii=False))
         flash(f'Ошибка при добавлении товара: {str(e)}', 'danger')
     return redirect(url_for('admin_products'))
 
@@ -500,9 +576,21 @@ def admin_edit_product():
         product.category = category if category else 'Общее'
         product.image = image if image else product.image
         db.session.commit()
+        app.logger.info(json.dumps({
+            "event": "admin_action",
+            "action": "edit_product",
+            "product_id": product.id,
+            "product_name": name
+        }, ensure_ascii=False))
+
         flash(f'Товар "{name}" успешно обновлен', 'success')
     except Exception as e:
         db.session.rollback()
+        app.logger.error(json.dumps({
+            "event": "exception",
+            "location": "admin_edit_product",
+            "error": str(e)
+        }, ensure_ascii=False))
         flash(f'Ошибка при обновлении товара: {str(e)}', 'danger')
     return redirect(url_for('admin_products'))
 
@@ -536,6 +624,13 @@ def admin_add_user():
         )
         db.session.add(new_user)
         db.session.commit()
+        app.logger.info(json.dumps({
+            "event": "admin_action",
+            "action": "add_user",
+            "username": username,
+            "email": email,
+            "role": role
+        }, ensure_ascii=False))
         flash(f'Пользователь "{username}" успешно добавлен', 'success')
     except Exception as e:
         db.session.rollback()
@@ -566,6 +661,15 @@ def admin_edit_user():
         if password:
             user.password = hashlib.md5(password.encode('utf-8')).hexdigest()
         db.session.commit()
+        app.logger.info(json.dumps({
+            "event": "admin_action",
+            "action": "edit_user",
+            "user_id": user.id,
+            "username": username,
+            "email": email,
+            "role": role
+        }, ensure_ascii=False))
+
         flash(f'Пользователь "{username}" успешно обновлен', 'success')
     except Exception as e:
         db.session.rollback()
@@ -608,6 +712,12 @@ def update_environment():
         if control.min_value <= new_value <= control.max_value:
             control.current_value = new_value
             db.session.commit()
+            app.logger.info(json.dumps({
+                "event": "environment_update",
+                "parameter": control.parameter,
+                "new_value": new_value,
+                "unit": control.unit
+            }, ensure_ascii=False))
             flash(f'Параметр "{control.parameter}" обновлен до {new_value} {control.unit}', 'success')
         else:
             flash(f'Значение должно быть в диапазоне от {control.min_value} до {control.max_value} {control.unit}',
@@ -631,6 +741,13 @@ def update_resource():
             if new_value <= resource.max_level:
                 resource.current_level = new_value
                 db.session.commit()
+                app.logger.info(json.dumps({
+                    "event": "resource_increase",
+                    "resource": resource.name,
+                    "amount": amount,
+                    "unit": resource.unit,
+                    "new_level": new_value
+                }, ensure_ascii=False))
                 flash(f'Ресурс "{resource.name}" увеличен на {amount} {resource.unit}', 'success')
             else:
                 flash(f'Невозможно увеличить "{resource.name}" выше максимума {resource.max_level} {resource.unit}',
@@ -640,6 +757,13 @@ def update_resource():
             if new_value >= 0:
                 resource.current_level = new_value
                 db.session.commit()
+                app.logger.info(json.dumps({
+                    "event": "resource_decrease",
+                    "resource": resource.name,
+                    "amount": amount,
+                    "unit": resource.unit,
+                    "new_level": new_value
+                }, ensure_ascii=False))
                 flash(f'Ресурс "{resource.name}" уменьшен на {amount} {resource.unit}', 'success')
             else:
                 flash(f'Невозможно уменьшить "{resource.name}" ниже 0 {resource.unit}', 'danger')
@@ -676,6 +800,10 @@ def store():
         ])
 
         if search_query and is_injection:
+            app.logger.warning(json.dumps({
+                "event": "sql_injection_detected",
+                "search_query": search_query
+            }, ensure_ascii=False))
             if 'pg_sleep' in search_query.lower():
                 flash('Товар найден', 'success')
                 pagination = SimpleNamespace(
@@ -913,6 +1041,11 @@ def checkout(product_id):
 
     if request.method == 'POST':
         try:
+            app.logger.info(json.dumps({
+                "event": "checkout_attempt",
+                "user_id": session['user_id'],
+                "product_id": product_id
+            }, ensure_ascii=False))
             quantity = int(request.form.get('quantity', 1))
 
             if quantity > 3:
@@ -972,10 +1105,20 @@ def payment(transaction_id):
                 product.stock = 999
                 flash(f'Товар "{product.name}" был автоматически пополнен до 999 единиц', 'info')
             db.session.commit()
+            app.logger.info(json.dumps({
+                "event": "payment_completed",
+                "transaction_id": transaction.transaction_id,
+                "user_id": session['user_id']
+            }, ensure_ascii=False))
             flash('Оплата прошла успешно!', 'success')
             return redirect(url_for('payment_success', transaction_id=transaction_id))
         except Exception as e:
             db.session.rollback()
+            app.logger.error(json.dumps({
+                "event": "exception",
+                "location": "payment",
+                "error": str(e)
+            }, ensure_ascii=False))
             flash('Ошибка при обработке платежа', 'danger')
             return redirect(url_for('payment', transaction_id=transaction_id))
     return render_template('payment.html', transaction=transaction, product=product)
@@ -1106,6 +1249,10 @@ def init_db():
                 print("Контроли окружающей среды добавлены.")
         except Exception as e:
             db.session.rollback()
+            app.logger.error(json.dumps({
+                "event": "init_db_error",
+                "error": str(e)
+            }, ensure_ascii=False))
             print(f"Ошибка при создании БД: {e}")
 
 
