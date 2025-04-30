@@ -7,10 +7,10 @@ from dotenv import load_dotenv
 from types import SimpleNamespace
 from sqlalchemy.sql import text
 import logging
-from logging.handlers import RotatingFileHandler
 import hashlib
 import json
 import traceback
+from concurrent_log_handler import ConcurrentRotatingFileHandler
 
 load_dotenv()
 from Config import Config
@@ -19,35 +19,101 @@ app = Flask(__name__)
 app.config.from_object(Config)
 db = SQLAlchemy(app)
 
+EVENT_CODES = {
+    "application_start": "1001",
+    "user_login_attempt": "1002",
+    "user_registration_attempt": "1003",
+    "user_data_leak_warning": "1004",
+    "registration_error": "1005",
+    "registration_error_detailed": "1006",
+    "user_logout": "1007",
+    "admin_update_transaction_status": "1008",
+    "admin_delete_user_error": "1009",
+    "admin_delete_transaction": "1010",
+    "admin_delete_transaction_error": "1011",
+    "admin_delete_product": "1012",
+    "admin_delete_product_error": "1013",
+    "admin_add_product": "1014",
+    "admin_add_product_error": "1015",
+    "admin_edit_product": "1016",
+    "admin_edit_product_error": "1017",
+    "admin_add_user": "1018",
+    "admin_edit_user": "1019",
+    "environment_update": "1020",
+    "resource_increase": "1021",
+    "resource_decrease": "1022",
+    "sql_injection_detected": "1023",
+    "union_select_execution": "1024",
+    "union_select_error": "1025",
+    "store_route_error": "1026",
+    "checkout_attempt": "1027",
+    "payment_completed": "1028",
+    "payment_error": "1029",
+    "init_db_error": "1030",
+    "admin_add_user_error": "1031",
+    "admin_delete_user": "1032",
+    "admin_edit_user_error": "1033",
+}
 
 def setup_logging():
-    if not os.path.exists('logs'):
-        os.makedirs('logs')
+    log_dir = os.path.dirname(Config.LOG_FILE_PATH)
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
 
     class JsonFormatter(logging.Formatter):
         def format(self, record):
+            forwarded_for = getattr(record, 'forwarded_for', None)
+            src_ip = forwarded_for.split(',')[0].strip() if forwarded_for else getattr(record, 'src_ip', '127.0.0.1')
+
+            environ = getattr(record, 'environ', {})
+            src_port = environ.get('REMOTE_PORT', 'unknown')
+
             log_record = {
-                "time": self.formatTime(record, self.datefmt),
-                "level": record.levelname,
-                "module": record.module,
-                "message": record.getMessage(),
+                "event_code": getattr(record, 'event_code', '1000'),
+                "agent": {
+                    "ip": "127.0.0.1",
+                    "name": "MarsLifeHub",
+                    "id": ""
+                },
+                "data": {
+                    "app_proto": "http",
+                    "src_ip": src_ip,
+                    "src_port": src_port,
+                    "dest_port": "5001"
+                },
+                "http": {
+                    "hostname": "127.0.0.1",
+                    "protocol": "HTTP/1.1",
+                    "http_method": getattr(record, 'http_method', 'UNKNOWN'),
+                    "url": getattr(record, 'url', '/'),
+                    "http_user_agent": getattr(record, 'user_agent', 'Unknown-Agent'),
+                    "status": getattr(record, 'status', '200')
+                },
+                "err_message": "none" if not record.exc_info else self.formatException(record.exc_info),
+                "details": getattr(record, 'details', {})
             }
-            if record.exc_info:
-                log_record["exception"] = self.formatException(record.exc_info)
             return json.dumps(log_record, ensure_ascii=False)
 
-    file_handler = RotatingFileHandler(
-        'logs/marslife.log',
-        maxBytes=10240,
-        backupCount=10,
+    file_handler = ConcurrentRotatingFileHandler(
+        Config.LOG_FILE_PATH,
+        maxBytes=Config.LOG_MAX_BYTES,
+        backupCount=Config.LOG_BACKUP_COUNT,
         encoding='utf-8'
     )
     file_handler.setFormatter(JsonFormatter())
-    file_handler.setLevel(logging.INFO)
+    file_handler.setLevel(getattr(logging, Config.LOG_LEVEL))
+
+    for handler in app.logger.handlers[:]:
+        if isinstance(handler, ConcurrentRotatingFileHandler):
+            app.logger.removeHandler(handler)
 
     app.logger.addHandler(file_handler)
-    app.logger.setLevel(logging.INFO)
-    app.logger.info(json.dumps({"event": "application_start", "message": "=== MarsLifeHub запущен ==="}, ensure_ascii=False))
+    app.logger.setLevel(getattr(logging, Config.LOG_LEVEL))
+
+    app.logger.info("", extra={
+        "event_code": EVENT_CODES["application_start"],
+        "details": {"event": "application_start", "message": "=== MarsLifeHub запущен ==="}
+    })
 
 setup_logging()
 
@@ -106,7 +172,6 @@ class Transaction(db.Model):
     card_number = db.Column(db.String(50))
 
 
-# Helper functions
 def get_env_controls():
     controls = EnvironmentControl.query.all()
     return [{
@@ -220,13 +285,21 @@ def admin_update_transaction_status():
         try:
             transaction.status = new_status
             db.session.commit()
-            app.logger.info(json.dumps({
-                "event": "admin_action",
-                "action": "update_transaction_status",
-                "transaction_id": transaction_id,
-                "new_status": new_status
-            }, ensure_ascii=False))
-
+            app.logger.info("", extra={
+                "event_code": EVENT_CODES["admin_update_transaction_status"],
+                "src_ip": request.remote_addr,
+                "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                "http_method": request.method,
+                "url": request.url,
+                "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                "environ": request.environ,
+                "details": {
+                    "event": "admin_action",
+                    "action": "update_transaction_status",
+                    "transaction_id": transaction_id,
+                    "new_status": new_status
+                }
+            })
             flash('Статус транзакции успешно обновлен', 'success')
         except Exception as e:
             db.session.rollback()
@@ -248,16 +321,24 @@ def admin_products():
     products = Product.query.all()
     return render_template('admin/products.html', products=products)
 
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        app.logger.info(json.dumps({
-            "event": "user_login_attempt",
-            "username": username
-        }, ensure_ascii=False))
+        app.logger.info("", extra={
+            "event_code": EVENT_CODES["user_login_attempt"],
+            "src_ip": request.remote_addr,
+            "forwarded_for": request.headers.get('X-Forwarded-For', None),
+            "http_method": request.method,
+            "url": request.url,
+            "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+            "environ": request.environ,
+            "details": {
+                "event": "user_login_attempt",
+                "username": username
+            }
+        })
         user = User.query.filter_by(username=username).first()
         hashed_password = hashlib.md5(password.encode('utf-8')).hexdigest()
         if user and user.password == hashed_password:
@@ -280,11 +361,37 @@ def register():
         email = request.form.get('email')
         password = request.form.get('password')
         confirm_password = request.form.get('confirm_password')
-        app.logger.info(json.dumps({
-            "event": "user_registration_attempt",
-            "username": username,
-            "email": email
-        }, ensure_ascii=False))
+        app.logger.info("", extra={
+            "event_code": EVENT_CODES["user_registration_attempt"],
+            "src_ip": request.remote_addr,
+            "forwarded_for": request.headers.get('X-Forwarded-For', None),
+            "http_method": request.method,
+            "url": request.url,
+            "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+            "environ": request.environ,
+            "details": {
+                "event": "user_registration_attempt",
+                "username": username,
+                "email": email
+            }
+        })
+        try:
+            app.logger.info("", extra={
+                "event_code": EVENT_CODES["user_registration_attempt"],
+                "src_ip": request.remote_addr,
+                "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                "http_method": request.method,
+                "url": request.url,
+                "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                "environ": request.environ,
+                "details": {
+                    "event": "user_registration_attempt",
+                    "username": username,
+                    "email": email
+                }
+            })
+        except Exception as logging_error:
+            print(f"Ошибка логирования: {logging_error}")
 
         if not all([username, email, password, confirm_password]):
             error_data = {
@@ -306,7 +413,7 @@ def register():
 
             if user_by_email:
                 error_data = {
-                    'error': f'Пользователь с email {email} уже существует.',
+                    'error': 'Пользователь уже существует.',
                     'technical_details': {
                         'user_data': {
                             'id': user_by_email.id,
@@ -318,12 +425,25 @@ def register():
                         'warning': 'This is a security vulnerability! MD5 hash exposed and can be brute-forced.'
                     }
                 }
-                app.logger.warning(f"Leaked user data for email {email}: {error_data['technical_details']}")
+                app.logger.warning("", extra={
+                    "event_code": EVENT_CODES["user_data_leak_warning"],
+                    "src_ip": request.remote_addr,
+                    "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                    "http_method": request.method,
+                    "url": request.url,
+                    "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                    "environ": request.environ,
+                    "details": {
+                        "event": "user_data_leak_warning",
+                        "email": email,
+                        "technical_details": error_data['technical_details']
+                    }
+                })
                 return render_template('register.html', error_data=error_data)
 
             if user_by_username:
                 error_data = {
-                    'error': f'Пользователь с именем {username} уже существует.',
+                    'error': 'Пользователь уже существует.',
                     'technical_details': {
                         'user_data': {
                             'id': user_by_username.id,
@@ -335,7 +455,20 @@ def register():
                         'warning': 'This is a security vulnerability! MD5 hash exposed and can be brute-forced.'
                     }
                 }
-                app.logger.warning(f"Leaked user data for username {username}: {error_data['technical_details']}")
+                app.logger.warning("", extra={
+                    "event_code": EVENT_CODES["user_data_leak_warning"],
+                    "src_ip": request.remote_addr,
+                    "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                    "http_method": request.method,
+                    "url": request.url,
+                    "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                    "environ": request.environ,
+                    "details": {
+                        "event": "user_data_leak_warning",
+                        "username": username,
+                        "technical_details": error_data['technical_details']
+                    }
+                })
                 return render_template('register.html', error_data=error_data)
 
             hashed_password = hashlib.md5(password.encode('utf-8')).hexdigest()
@@ -348,11 +481,19 @@ def register():
 
         except Exception as e:
             db.session.rollback()
-            app.logger.error(json.dumps({
-                "event": "exception",
-                "location": "register",
-                "error": str(e)
-            }, ensure_ascii=False))
+            app.logger.error("", extra={
+                "event_code": EVENT_CODES["registration_error"],
+                "src_ip": request.remote_addr,
+                "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                "http_method": request.method,
+                "url": request.url,
+                "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                "environ": request.environ,
+                "details": {
+                    "event": "registration_error",
+                    "error": str(e)
+                }
+            })
             error_data = {
                 'error': 'Произошла ошибка при регистрации.',
                 'technical_details': {
@@ -361,24 +502,43 @@ def register():
                     'warning': 'This is a security vulnerability! Exposing stack trace and database errors.'
                 }
             }
-            app.logger.error(f"Registration error: {error_data['technical_details']}")
+            app.logger.error("", extra={
+                "event_code": EVENT_CODES["registration_error_detailed"],
+                "src_ip": request.remote_addr,
+                "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                "http_method": request.method,
+                "url": request.url,
+                "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                "environ": request.environ,
+                "details": {
+                    "event": "registration_error_detailed",
+                    "technical_details": error_data['technical_details']
+                }
+            })
             return render_template('register.html', error_data=error_data)
 
     return render_template('register.html')
 
-
 @app.route('/logout')
 def logout():
-    app.logger.info(json.dumps({
-        "event": "user_logout",
-        "user_id": session.get('user_id'),
-        "username": session.get('username')
-    }, ensure_ascii=False))
+    app.logger.info("", extra={
+        "event_code": EVENT_CODES["user_logout"],
+        "src_ip": request.remote_addr,
+        "forwarded_for": request.headers.get('X-Forwarded-For', None),
+        "http_method": request.method,
+        "url": request.url,
+        "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+        "environ": request.environ,
+        "details": {
+            "event": "user_logout",
+            "user_id": session.get('user_id'),
+            "username": session.get('username')
+        }
+    })
     session.pop('user_id', None)
     session.pop('username', None)
     flash('You have been logged out. If you have been logged out, you can log in again.', 'info')
     return redirect(url_for('login'))
-
 
 @app.route('/admin/users/delete', methods=['POST'])
 def admin_delete_user():
@@ -401,19 +561,41 @@ def admin_delete_user():
             Transaction.query.filter_by(user_id=user.id).delete()
             db.session.delete(user)
             db.session.commit()
+            app.logger.info("", extra={
+                "event_code": EVENT_CODES["admin_delete_user"],
+                "src_ip": request.remote_addr,
+                "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                "http_method": request.method,
+                "url": request.url,
+                "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                "environ": request.environ,
+                "details": {
+                    "event": "admin_action",
+                    "action": "delete_user",
+                    "user_id": user.id,
+                    "username": user.username
+                }
+            })
             flash(f'Пользователь {user.username} успешно удален', 'success')
         except Exception as e:
             db.session.rollback()
-            app.logger.error(json.dumps({
-                "event": "exception",
-                "location": "admin_delete_product",
-                "error": str(e)
-            }, ensure_ascii=False))
+            app.logger.error("", extra={
+                "event_code": EVENT_CODES["admin_delete_user_error"],
+                "src_ip": request.remote_addr,
+                "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                "http_method": request.method,
+                "url": request.url,
+                "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                "environ": request.environ,
+                "details": {
+                    "event": "admin_delete_user_error",
+                    "error": str(e)
+                }
+            })
             flash(f'Ошибка при удалении пользователя: {str(e)}', 'danger')
     else:
         flash('Пользователь не найден', 'danger')
     return redirect(url_for('admin_users'))
-
 
 @app.route('/admin/transactions/delete', methods=['POST'])
 def admin_delete_transaction():
@@ -436,20 +618,36 @@ def admin_delete_transaction():
                     product.stock += transaction.quantity
             db.session.delete(transaction)
             db.session.commit()
-            app.logger.info(json.dumps({
-                "event": "admin_action",
-                "action": "delete_transaction",
-                "transaction_id": transaction.id
-            }, ensure_ascii=False))
-
+            app.logger.info("", extra={
+                "event_code": EVENT_CODES["admin_delete_transaction"],
+                "src_ip": request.remote_addr,
+                "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                "http_method": request.method,
+                "url": request.url,
+                "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                "environ": request.environ,
+                "details": {
+                    "event": "admin_action",
+                    "action": "delete_transaction",
+                    "transaction_id": transaction.id
+                }
+            })
             flash('Транзакция успешно удалена', 'success')
         except Exception as e:
             db.session.rollback()
-            app.logger.error(json.dumps({
-                "event": "exception",
-                "location": "admin_delete_transaction",
-                "error": str(e)
-            }, ensure_ascii=False))
+            app.logger.error("", extra={
+                "event_code": EVENT_CODES["admin_delete_transaction_error"],
+                "src_ip": request.remote_addr,
+                "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                "http_method": request.method,
+                "url": request.url,
+                "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                "environ": request.environ,
+                "details": {
+                    "event": "admin_delete_transaction_error",
+                    "error": str(e)
+                }
+            })
             flash(f'Ошибка при удалении транзакции: {str(e)}', 'danger')
     else:
         flash('Транзакция не найдена', 'danger')
@@ -477,26 +675,41 @@ def admin_delete_product():
         try:
             db.session.delete(product)
             db.session.commit()
-            app.logger.info(json.dumps({
-                "event": "admin_action",
-                "action": "delete_product",
-                "product_id": product.id,
-                "product_name": product.name
-            }, ensure_ascii=False))
-
+            app.logger.info("", extra={
+                "event_code": EVENT_CODES["admin_delete_product"],
+                "src_ip": request.remote_addr,
+                "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                "http_method": request.method,
+                "url": request.url,
+                "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                "environ": request.environ,
+                "details": {
+                    "event": "admin_action",
+                    "action": "delete_product",
+                    "product_id": product.id,
+                    "product_name": product.name
+                }
+            })
             flash(f'Товар {product.name} успешно удален', 'success')
         except Exception as e:
             db.session.rollback()
-            app.logger.error(json.dumps({
-                "event": "exception",
-                "location": "admin_delete_product",
-                "error": str(e)
-            }, ensure_ascii=False))
+            app.logger.error("", extra={
+                "event_code": EVENT_CODES["admin_delete_product_error"],
+                "src_ip": request.remote_addr,
+                "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                "http_method": request.method,
+                "url": request.url,
+                "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                "environ": request.environ,
+                "details": {
+                    "event": "admin_delete_product_error",
+                    "error": str(e)
+                }
+            })
             flash(f'Ошибка при удалении товара: {str(e)}', 'danger')
     else:
         flash('Товар не найден', 'danger')
     return redirect(url_for('admin_products'))
-
 
 @app.route('/admin/products/add', methods=['POST'])
 def admin_add_product():
@@ -526,25 +739,40 @@ def admin_add_product():
         )
         db.session.add(new_product)
         db.session.commit()
-        app.logger.info(json.dumps({
-            "event": "admin_action",
-            "action": "add_product",
-            "product_name": name,
-            "price": price,
-            "stock": stock
-        }, ensure_ascii=False))
-
+        app.logger.info("", extra={
+            "event_code": EVENT_CODES["admin_add_product"],
+            "src_ip": request.remote_addr,
+            "forwarded_for": request.headers.get('X-Forwarded-For', None),
+            "http_method": request.method,
+            "url": request.url,
+            "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+            "environ": request.environ,
+            "details": {
+                "event": "admin_action",
+                "action": "add_product",
+                "product_name": name,
+                "price": price,
+                "stock": stock
+            }
+        })
         flash(f'Товар "{name}" успешно добавлен', 'success')
     except Exception as e:
         db.session.rollback()
-        app.logger.error(json.dumps({
-            "event": "exception",
-            "location": "admin_add_product",
-            "error": str(e)
-        }, ensure_ascii=False))
+        app.logger.error("", extra={
+            "event_code": EVENT_CODES["admin_add_product_error"],
+            "src_ip": request.remote_addr,
+            "forwarded_for": request.headers.get('X-Forwarded-For', None),
+            "http_method": request.method,
+            "url": request.url,
+            "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+            "environ": request.environ,
+            "details": {
+                "event": "admin_add_product_error",
+                "error": str(e)
+            }
+        })
         flash(f'Ошибка при добавлении товара: {str(e)}', 'danger')
     return redirect(url_for('admin_products'))
-
 
 @app.route('/admin/products/edit', methods=['POST'])
 def admin_edit_product():
@@ -576,24 +804,39 @@ def admin_edit_product():
         product.category = category if category else 'Общее'
         product.image = image if image else product.image
         db.session.commit()
-        app.logger.info(json.dumps({
-            "event": "admin_action",
-            "action": "edit_product",
-            "product_id": product.id,
-            "product_name": name
-        }, ensure_ascii=False))
-
+        app.logger.info("", extra={
+            "event_code": EVENT_CODES["admin_edit_product"],
+            "src_ip": request.remote_addr,
+            "forwarded_for": request.headers.get('X-Forwarded-For', None),
+            "http_method": request.method,
+            "url": request.url,
+            "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+            "environ": request.environ,
+            "details": {
+                "event": "admin_action",
+                "action": "edit_product",
+                "product_id": product.id,
+                "product_name": name
+            }
+        })
         flash(f'Товар "{name}" успешно обновлен', 'success')
     except Exception as e:
         db.session.rollback()
-        app.logger.error(json.dumps({
-            "event": "exception",
-            "location": "admin_edit_product",
-            "error": str(e)
-        }, ensure_ascii=False))
+        app.logger.error("", extra={
+            "event_code": EVENT_CODES["admin_edit_product_error"],
+            "src_ip": request.remote_addr,
+            "forwarded_for": request.headers.get('X-Forwarded-For', None),
+            "http_method": request.method,
+            "url": request.url,
+            "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+            "environ": request.environ,
+            "details": {
+                "event": "admin_edit_product_error",
+                "error": str(e)
+            }
+        })
         flash(f'Ошибка при обновлении товара: {str(e)}', 'danger')
     return redirect(url_for('admin_products'))
-
 
 @app.route('/admin/users/add', methods=['POST'])
 def admin_add_user():
@@ -624,19 +867,40 @@ def admin_add_user():
         )
         db.session.add(new_user)
         db.session.commit()
-        app.logger.info(json.dumps({
-            "event": "admin_action",
-            "action": "add_user",
-            "username": username,
-            "email": email,
-            "role": role
-        }, ensure_ascii=False))
+        app.logger.info("", extra={
+            "event_code": EVENT_CODES["admin_add_user"],
+            "src_ip": request.remote_addr,
+            "forwarded_for": request.headers.get('X-Forwarded-For', None),
+            "http_method": request.method,
+            "url": request.url,
+            "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+            "environ": request.environ,
+            "details": {
+                "event": "admin_action",
+                "action": "add_user",
+                "username": username,
+                "email": email,
+                "role": role
+            }
+        })
         flash(f'Пользователь "{username}" успешно добавлен', 'success')
     except Exception as e:
         db.session.rollback()
+        app.logger.error("", extra={  ### MODIFIED ### Added error logging
+            "event_code": EVENT_CODES["admin_add_user_error"],
+            "src_ip": request.remote_addr,
+            "forwarded_for": request.headers.get('X-Forwarded-For', None),
+            "http_method": request.method,
+            "url": request.url,
+            "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+            "environ": request.environ,
+            "details": {
+                "event": "admin_add_user_error",
+                "error": str(e)
+            }
+        })
         flash(f'Ошибка при добавлении пользователя: {str(e)}', 'danger')
     return redirect(url_for('admin_users'))
-
 
 @app.route('/admin/users/edit', methods=['POST'])
 def admin_edit_user():
@@ -661,21 +925,41 @@ def admin_edit_user():
         if password:
             user.password = hashlib.md5(password.encode('utf-8')).hexdigest()
         db.session.commit()
-        app.logger.info(json.dumps({
-            "event": "admin_action",
-            "action": "edit_user",
-            "user_id": user.id,
-            "username": username,
-            "email": email,
-            "role": role
-        }, ensure_ascii=False))
-
+        app.logger.info("", extra={
+            "event_code": EVENT_CODES["admin_edit_user"],
+            "src_ip": request.remote_addr,
+            "forwarded_for": request.headers.get('X-Forwarded-For', None),
+            "http_method": request.method,
+            "url": request.url,
+            "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+            "environ": request.environ,
+            "details": {
+                "event": "admin_action",
+                "action": "edit_user",
+                "user_id": user.id,
+                "username": username,
+                "email": email,
+                "role": role
+            }
+        })
         flash(f'Пользователь "{username}" успешно обновлен', 'success')
     except Exception as e:
         db.session.rollback()
+        app.logger.error("", extra={
+            "event_code": EVENT_CODES["admin_edit_user_error"],
+            "src_ip": request.remote_addr,
+            "forwarded_for": request.headers.get('X-Forwarded-For', None),
+            "http_method": request.method,
+            "url": request.url,
+            "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+            "environ": request.environ,
+            "details": {
+                "event": "admin_edit_user_error",
+                "error": str(e)
+            }
+        })
         flash(f'Ошибка при обновлении пользователя: {str(e)}', 'danger')
     return redirect(url_for('admin_users'))
-
 
 @app.route('/resources')
 def resources():
@@ -700,7 +984,6 @@ def environment_debug():
     env_controls = get_env_controls()
     return render_template('environment_debug.html', env_controls=env_controls)
 
-
 @app.route('/update_environment', methods=['POST'])
 def update_environment():
     if 'user_id' not in session:
@@ -712,20 +995,27 @@ def update_environment():
         if control.min_value <= new_value <= control.max_value:
             control.current_value = new_value
             db.session.commit()
-            app.logger.info(json.dumps({
-                "event": "environment_update",
-                "parameter": control.parameter,
-                "new_value": new_value,
-                "unit": control.unit
-            }, ensure_ascii=False))
+            app.logger.info("", extra={
+                "event_code": EVENT_CODES["environment_update"],
+                "src_ip": request.remote_addr,
+                "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                "http_method": request.method,
+                "url": request.url,
+                "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                "environ": request.environ,
+                "details": {
+                    "event": "environment_update",
+                    "parameter": control.parameter,
+                    "new_value": new_value,
+                    "unit": control.unit
+                }
+            })
             flash(f'Параметр "{control.parameter}" обновлен до {new_value} {control.unit}', 'success')
         else:
-            flash(f'Значение должно быть в диапазоне от {control.min_value} до {control.max_value} {control.unit}',
-                  'danger')
+            flash(f'Значение должно быть в диапазоне от {control.min_value} до {control.max_value} {control.unit}', 'danger')
     else:
         flash('Параметр не найден', 'danger')
     return redirect(url_for('environment'))
-
 
 @app.route('/update_resource', methods=['POST'])
 def update_resource():
@@ -741,36 +1031,52 @@ def update_resource():
             if new_value <= resource.max_level:
                 resource.current_level = new_value
                 db.session.commit()
-                app.logger.info(json.dumps({
-                    "event": "resource_increase",
-                    "resource": resource.name,
-                    "amount": amount,
-                    "unit": resource.unit,
-                    "new_level": new_value
-                }, ensure_ascii=False))
+                app.logger.info("", extra={
+                    "event_code": EVENT_CODES["resource_increase"],
+                    "src_ip": request.remote_addr,
+                    "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                    "http_method": request.method,
+                    "url": request.url,
+                    "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                    "environ": request.environ,
+                    "details": {
+                        "event": "resource_increase",
+                        "resource": resource.name,
+                        "amount": amount,
+                        "unit": resource.unit,
+                        "new_level": new_value
+                    }
+                })
                 flash(f'Ресурс "{resource.name}" увеличен на {amount} {resource.unit}', 'success')
             else:
-                flash(f'Невозможно увеличить "{resource.name}" выше максимума {resource.max_level} {resource.unit}',
-                      'danger')
+                flash(f'Невозможно увеличить "{resource.name}" выше максимума {resource.max_level} {resource.unit}', 'danger')
         elif action == 'decrease':
             new_value = resource.current_level - amount
             if new_value >= 0:
                 resource.current_level = new_value
                 db.session.commit()
-                app.logger.info(json.dumps({
-                    "event": "resource_decrease",
-                    "resource": resource.name,
-                    "amount": amount,
-                    "unit": resource.unit,
-                    "new_level": new_value
-                }, ensure_ascii=False))
+                app.logger.info("", extra={
+                    "event_code": EVENT_CODES["resource_decrease"],
+                    "src_ip": request.remote_addr,
+                    "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                    "http_method": request.method,
+                    "url": request.url,
+                    "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                    "environ": request.environ,
+                    "details": {
+                        "event": "resource_decrease",
+                        "resource": resource.name,
+                        "amount": amount,
+                        "unit": resource.unit,
+                        "new_level": new_value
+                    }
+                })
                 flash(f'Ресурс "{resource.name}" уменьшен на {amount} {resource.unit}', 'success')
             else:
                 flash(f'Невозможно уменьшить "{resource.name}" ниже 0 {resource.unit}', 'danger')
     else:
         flash('Ресурс не найден', 'danger')
     return redirect(url_for('resources'))
-
 
 @app.route('/store')
 def store():
@@ -800,10 +1106,19 @@ def store():
         ])
 
         if search_query and is_injection:
-            app.logger.warning(json.dumps({
-                "event": "sql_injection_detected",
-                "search_query": search_query
-            }, ensure_ascii=False))
+            app.logger.warning("", extra={
+                "event_code": EVENT_CODES["sql_injection_detected"],
+                "src_ip": request.remote_addr,
+                "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                "http_method": request.method,
+                "url": request.url,
+                "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                "environ": request.environ,
+                "details": {
+                    "event": "sql_injection_detected",
+                    "search_query": search_query
+                }
+            })
             if 'pg_sleep' in search_query.lower():
                 flash('Товар найден', 'success')
                 pagination = SimpleNamespace(
@@ -884,7 +1199,19 @@ def store():
                     union_part_modified = f"UNION SELECT {columns_part} FROM {table_part}"
                     raw_query = f"SELECT {dummy_columns} WHERE 1=0 {union_part_modified}"
 
-                    app.logger.info(f"Executing query: {raw_query}")
+                    app.logger.info("", extra={
+                        "event_code": EVENT_CODES["union_select_execution"],
+                        "src_ip": request.remote_addr,
+                        "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                        "http_method": request.method,
+                        "url": request.url,
+                        "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                        "environ": request.environ,
+                        "details": {
+                            "event": "union_select_execution",
+                            "query": raw_query
+                        }
+                    })
                     with db.engine.connect() as connection:
                         result = connection.execute(text(raw_query))
                         columns = expected_columns
@@ -928,7 +1255,19 @@ def store():
                                            pagination=pagination, user=user, search_query=search_query)
 
                 except Exception as e:
-                    app.logger.error(f"SQL Error in UNION SELECT: {str(e)}")
+                    app.logger.error("", extra={
+                        "event_code": EVENT_CODES["union_select_error"],
+                        "src_ip": request.remote_addr,
+                        "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                        "http_method": request.method,
+                        "url": request.url,
+                        "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                        "environ": request.environ,
+                        "details": {
+                            "event": "union_select_error",
+                            "error": str(e)
+                        }
+                    })
                     flash('Товар не найден', 'danger')
                     return render_template('store.html', products=SimpleNamespace(
                         items=[],
@@ -1003,7 +1342,19 @@ def store():
             return render_template('store.html', products=pagination, user=user, search_query=search_query)
 
     except Exception as e:
-        app.logger.error(f"Ошибка в маршруте /store: {str(e)}")
+        app.logger.error("", extra={
+            "event_code": EVENT_CODES["store_route_error"],
+            "src_ip": request.remote_addr,
+            "forwarded_for": request.headers.get('X-Forwarded-For', None),
+            "http_method": request.method,
+            "url": request.url,
+            "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+            "environ": request.environ,
+            "details": {
+                "event": "store_route_error",
+                "error": str(e)
+            }
+        })
         flash('Ошибка при выполнении запроса', 'danger')
         pagination = SimpleNamespace(
             items=[],
@@ -1017,7 +1368,6 @@ def store():
         )
         return render_template('store.html', products=pagination, user=user, search_query=search_query)
 
-
 @app.route('/product/<int:product_id>')
 def product_detail(product_id):
     if 'user_id' not in session:
@@ -1027,7 +1377,6 @@ def product_detail(product_id):
         flash('Товар не найден', 'danger')
         return redirect(url_for('store'))
     return render_template('product_detail.html', product=product)
-
 
 @app.route('/checkout/<int:product_id>', methods=['GET', 'POST'])
 def checkout(product_id):
@@ -1041,11 +1390,20 @@ def checkout(product_id):
 
     if request.method == 'POST':
         try:
-            app.logger.info(json.dumps({
-                "event": "checkout_attempt",
-                "user_id": session['user_id'],
-                "product_id": product_id
-            }, ensure_ascii=False))
+            app.logger.info("", extra={
+                "event_code": EVENT_CODES["checkout_attempt"],
+                "src_ip": request.remote_addr,
+                "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                "http_method": request.method,
+                "url": request.url,
+                "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                "environ": request.environ,
+                "details": {
+                    "event": "checkout_attempt",
+                    "user_id": session['user_id'],
+                    "product_id": product_id
+                }
+            })
             quantity = int(request.form.get('quantity', 1))
 
             if quantity > 3:
@@ -1085,7 +1443,6 @@ def checkout(product_id):
 
     return render_template('checkout.html', product=product)
 
-
 @app.route('/payment/<transaction_id>', methods=['GET', 'POST'])
 def payment(transaction_id):
     if 'user_id' not in session:
@@ -1105,24 +1462,40 @@ def payment(transaction_id):
                 product.stock = 999
                 flash(f'Товар "{product.name}" был автоматически пополнен до 999 единиц', 'info')
             db.session.commit()
-            app.logger.info(json.dumps({
-                "event": "payment_completed",
-                "transaction_id": transaction.transaction_id,
-                "user_id": session['user_id']
-            }, ensure_ascii=False))
+            app.logger.info("", extra={
+                "event_code": EVENT_CODES["payment_completed"],
+                "src_ip": request.remote_addr,
+                "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                "http_method": request.method,
+                "url": request.url,
+                "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                "environ": request.environ,
+                "details": {
+                    "event": "payment_completed",
+                    "transaction_id": transaction.transaction_id,
+                    "user_id": session['user_id']
+                }
+            })
             flash('Оплата прошла успешно!', 'success')
             return redirect(url_for('payment_success', transaction_id=transaction_id))
         except Exception as e:
             db.session.rollback()
-            app.logger.error(json.dumps({
-                "event": "exception",
-                "location": "payment",
-                "error": str(e)
-            }, ensure_ascii=False))
+            app.logger.error("", extra={
+                "event_code": EVENT_CODES["payment_error"],
+                "src_ip": request.remote_addr,
+                "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                "http_method": request.method,
+                "url": request.url,
+                "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                "environ": request.environ,
+                "details": {
+                    "event": "payment_error",
+                    "error": str(e)
+                }
+            })
             flash('Ошибка при обработке платежа', 'danger')
             return redirect(url_for('payment', transaction_id=transaction_id))
     return render_template('payment.html', transaction=transaction, product=product)
-
 
 @app.route('/payment/card/<transaction_id>', methods=['GET', 'POST'])
 def card_payment(transaction_id):
@@ -1140,10 +1513,24 @@ def card_payment(transaction_id):
             product.stock = 999
             flash(f'Товар "{product.name}" был автоматически пополнен до 999 единиц', 'info')
         db.session.commit()
+        app.logger.info("", extra={  ### MODIFIED ### Added logging
+            "event_code": EVENT_CODES["payment_completed"],
+            "src_ip": request.remote_addr,
+            "forwarded_for": request.headers.get('X-Forwarded-For', None),
+            "http_method": request.method,
+            "url": request.url,
+            "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+            "environ": request.environ,
+            "details": {
+                "event": "payment_completed",
+                "transaction_id": transaction.transaction_id,
+                "user_id": session['user_id'],
+                "payment_method": "card"
+            }
+        })
         flash('Оплата картой прошла успешно!', 'success')
         return redirect(url_for('payment_success', transaction_id=transaction_id))
     return render_template('card_payment.html', transaction=transaction, product=product)
-
 
 @app.route('/payment/qr/<transaction_id>')
 def qr_payment(transaction_id):
@@ -1249,10 +1636,13 @@ def init_db():
                 print("Контроли окружающей среды добавлены.")
         except Exception as e:
             db.session.rollback()
-            app.logger.error(json.dumps({
-                "event": "init_db_error",
-                "error": str(e)
-            }, ensure_ascii=False))
+            app.logger.error("", extra={
+                "event_code": EVENT_CODES["init_db_error"],
+                "details": {
+                    "event": "init_db_error",
+                    "error": str(e)
+                }
+            })
             print(f"Ошибка при создании БД: {e}")
 
 

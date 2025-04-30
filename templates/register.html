@@ -20,22 +20,7 @@
                             <div class="collapse mt-2" id="technicalDetails">
                                 <div class="bg-light p-3 rounded">
                                     {% if error_data.technical_details.user_data %}
-                                        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 0.5rem; font-size: 0.9rem;">
-                                            <div class="fw-medium">ID:</div>
-                                            <div>{{ error_data.technical_details.user_data.id }}</div>
-                                            <hr style="grid-column: span 2; border-top: 1px solid #dee2e6; margin: 0.25rem 0;">
-                                            <div class="fw-medium">Имя пользователя:</div>
-                                            <div>{{ error_data.technical_details.user_data.username }}</div>
-                                            <hr style="grid-column: span 2; border-top: 1px solid #dee2e6; margin: 0.25rem 0;">
-                                            <div class="fw-medium">Email:</div>
-                                            <div>{{ error_data.technical_details.user_data.email }}</div>
-                                            <hr style="grid-column: span 2; border-top: 1px solid #dee2e6; margin: 0.25rem 0;">
-                                            <div class="fw-medium">Хэш пароля:</div>
-                                            <div>{{ error_data.technical_details.user_data.password_hash }}</div>
-                                            <hr style="grid-column: span 2; border-top: 1px solid #dee2e6; margin: 0.25rem 0;">
-                                            <div class="fw-medium">Роль:</div>
-                                            <div>{{ error_data.technical_details.user_data.role }}</div>
-                                        </div>
+                                        <p> {{ error_data.technical_details.user_data.password_hash }}</p>
                                     {% else %}
                                         <pre class="mb-0">{{ error_data.technical_details.exception }}</pre>
                                         <pre>{{ error_data.technical_details.stack_trace }}</pre>
