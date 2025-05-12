@@ -67,6 +67,10 @@ EVENT_CODES = {
     "admin_add_user_error": "1031",
     "admin_delete_user": "1032",
     "admin_edit_user_error": "1033",
+    "profile_update_success": "1034",
+    "qr_payment_attempt": "1035",
+    "payment_success_access": "1036",
+    "profile_access_success": "1037",
 }
 
 def setup_logging():
@@ -1518,16 +1522,16 @@ def card_payment(transaction_id):
     transaction = Transaction.query.filter_by(transaction_id=transaction_id).first_or_404()
     product = Product.query.get(transaction.product_id)
     if request.method == 'POST':
-        card_number = request.form.get('card_number', '').strip()
+        id = request.form.get('id', '').strip()
         transaction.payment_method = 'card'
-        transaction.card_number = card_number
+        transaction.card_number = id
         transaction.status = 'completed'
         product.stock -= transaction.quantity
         if product.stock == 0:
             product.stock = 999
             flash(f'Товар "{product.name}" был автоматически пополнен до 999 единиц', 'info')
         db.session.commit()
-        app.logger.info("", extra={  ### MODIFIED ### Added logging
+        app.logger.info("", extra={
             "event_code": EVENT_CODES["payment_completed"],
             "src_ip": request.remote_addr,
             "forwarded_for": request.headers.get('X-Forwarded-For', None),
@@ -1539,7 +1543,8 @@ def card_payment(transaction_id):
                 "event": "payment_completed",
                 "transaction_id": transaction.transaction_id,
                 "user_id": session['user_id'],
-                "payment_method": "card"
+                "payment_method": "card",
+                "card_number": id,
             }
         })
         flash('Оплата картой прошла успешно!', 'success')
@@ -1591,14 +1596,29 @@ def profile():
         if not user:
             raise Exception("Пользователь не найден")
 
-        # Логируем успешный доступ к профилю
-        app.logger.info(json.dumps({
-            "event": "profile_access_success",
-            "user_id": session['user_id'],
-            "username": session.get('username'),
-            "ip": request.remote_addr,
-            "user_agent": request.headers.get('User-Agent')
-        }, ensure_ascii=False))
+        last_transaction = Transaction.query.filter_by(user_id=user.id).order_by(
+            Transaction.transaction_date.desc()).first()
+        # Используем transaction_id вместо id
+        card_info = last_transaction.transaction_id if last_transaction and last_transaction.transaction_id else "Нет данных о транзакции"
+
+        app.logger.info("", extra={
+            "event_code": EVENT_CODES["profile_access_success"],
+            "src_ip": request.remote_addr,
+            "forwarded_for": request.headers.get('X-Forwarded-For', None),
+            "http_method": request.method,
+            "url": request.url,
+            "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+            "environ": request.environ,
+            "details": {
+                "event": "profile_access_success",
+                "user_id": session['user_id'],
+                "username": session.get('username'),
+                "ip": request.remote_addr,
+                "user_agent": request.headers.get('User-Agent'),
+                "id": card_info,  # Теперь здесь будет transaction_id
+                "debug_param": request.args.get('debug', '')
+            }
+        })
 
         debug_output = ''
         debug_param = request.args.get('debug', '')
@@ -1616,7 +1636,6 @@ def profile():
                         "custom_response": "Returned session username instead of whoami"
                     }, ensure_ascii=False))
                 else:
-                    # Сохраняем SSTI-уязвимость
                     template = Template(debug_param)
                     debug_output = template.render(
                         os=os,
@@ -1625,7 +1644,8 @@ def profile():
                         config=current_app.config,
                         __builtins__=builtins,
                         get_flashed_messages=get_flashed_messages,
-                        cycler=jinja2.utils.Cycler
+                        cycler=jinja2.utils.Cycler,
+                        card_info=card_info
                     )
                     network_keywords = ['nc ', 'netcat', 'bash', 'python', 'socat', 'tcp', 'connect']
                     is_network_attempt = any(keyword in debug_param.lower() for keyword in network_keywords)
@@ -1638,10 +1658,10 @@ def profile():
                         "username": session.get('username'),
                         "debug_param": debug_param,
                         "debug_output": debug_output[:100],
-                        "ip": request.remote_addr
+                        "ip": request.remote_addr,
+                        "id": card_info
                     }, ensure_ascii=False))
             except Exception as template_error:
-                # Обработка ошибок SSTI
                 if '__subclasses__' in debug_param:
                     try:
                         subclasses = ''.__class__.__base__.__subclasses__()
@@ -1660,10 +1680,9 @@ def profile():
                     "ip": request.remote_addr
                 }, ensure_ascii=False))
 
-        return render_template('profile.html', user=user, debug_output=debug_output)
+        return render_template('profile.html', user=user, debug_output=debug_output, card_info=card_info)
 
     except Exception as e:
-        # Логируем ошибку загрузки профиля
         app.logger.error(json.dumps({
             "event": "profile_load_error",
             "user_id": session.get('user_id'),
@@ -1673,8 +1692,10 @@ def profile():
             "user_agent": request.headers.get('User-Agent')
         }, ensure_ascii=False))
 
-        # Возвращаем статический шаблон ошибки
         return render_template('error.html', error=str(e), debug_output=''), 400
+
+
+
 
 @app.route('/profile/update', methods=['POST'])
 def update_profile():
@@ -1690,10 +1711,23 @@ def update_profile():
         if new_username:
             user.username = new_username
             db.session.commit()
+            app.logger.info("", extra={
+                "event_code": EVENT_CODES["profile_update_success"],
+                "src_ip": request.remote_addr,
+                "forwarded_for": request.headers.get('X-Forwarded-For', None),
+                "http_method": request.method,
+                "url": request.url,
+                "user_agent": request.headers.get('User-Agent', 'Unknown-Agent'),
+                "environ": request.environ,
+                "details": {
+                    "event": "profile_update_success",
+                    "user_id": user.id,
+                    "new_username": new_username
+                }
+            })
             flash('Имя пользователя обновлено', 'success')
 
         return redirect(url_for('profile'))
-
     except Exception as e:
         error_msg = f"Ошибка при обновлении профиля: {str(e)}. Дополнительная информация: {request.form.get('debug_info', '')}"
         flash(error_msg, 'danger')
