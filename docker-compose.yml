@@ -1,5 +1,3 @@
-version: '3.13'
-
 services:
   db:
     image: postgres:17
@@ -11,6 +9,13 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   app:
     build:
@@ -21,7 +26,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:987654@db/testdb
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     volumes:
       - .:/app
     networks:

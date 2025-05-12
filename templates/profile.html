@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Профиль{% endblock %}
+{% block content %}
+<div class="container">
+    <h1>Профиль пользователя</h1>
+    <p><strong>Имя пользователя:</strong> {{ user.username }}</p>
+    <p><strong>Email:</strong> {{ user.email }}</p>
+    <p><strong>Роль:</strong> {{ user.role }}</p>
+    {% if debug_output %}
+        <p><strong>Результат отладки:</strong> {{ debug_output | safe }}</p>
+    {% endif %}
+    <form method="POST" action="{{ url_for('update_profile') }}">
+        <div class="mb-3">
+            <label for="username" class="form-label">Новое имя пользователя</label>
+            <input type="text" class="form-control" id="username" name="username" value="{{ user.username }}">
+        </div>
+        <button type="submit" class="btn btn-primary">Обновить</button>
+    </form>
+</div>
+{% endblock %}

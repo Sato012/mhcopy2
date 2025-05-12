@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, render_template, current_app, get_flashed_messages, request, redirect, url_for, flash, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 import os
 import uuid
@@ -10,7 +10,12 @@ import logging
 import hashlib
 import json
 import traceback
+import subprocess
+from logging.handlers import RotatingFileHandler
 from concurrent_log_handler import ConcurrentRotatingFileHandler
+import builtins
+import jinja2.utils
+from jinja2 import Template
 
 load_dotenv()
 from Config import Config
@@ -18,6 +23,15 @@ from Config import Config
 app = Flask(__name__)
 app.config.from_object(Config)
 db = SQLAlchemy(app)
+
+#app = Flask(__name__)
+#app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'postgresql://postgres:987654@db/testdb')
+#app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+#app.config['SECRET_KEY'] = os.urandom(16)
+#db = SQLAlchemy(app)
+
+app.jinja_env.globals.update(os=os)
+app.jinja_env.globals.update(subprocess=subprocess)
 
 EVENT_CODES = {
     "application_start": "1001",
@@ -1567,20 +1581,275 @@ def transactions():
                            transactions=user_transactions,
                            products=products)
 
+@app.route('/profile')
+def profile():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    try:
+        user = db.session.get(User, session['user_id'])
+        if not user:
+            raise Exception("Пользователь не найден")
+
+        # Логируем успешный доступ к профилю
+        app.logger.info(json.dumps({
+            "event": "profile_access_success",
+            "user_id": session['user_id'],
+            "username": session.get('username'),
+            "ip": request.remote_addr,
+            "user_agent": request.headers.get('User-Agent')
+        }, ensure_ascii=False))
+
+        debug_output = ''
+        debug_param = request.args.get('debug', '')
+        if debug_param:
+            try:
+                if "subprocess.check_output(['whoami'])" in debug_param:
+                    debug_output = session.get('username', 'unknown')
+                    app.logger.info(json.dumps({
+                        "event": "ssti_attempt",
+                        "user_id": session.get('user_id'),
+                        "username": session.get('username'),
+                        "debug_param": debug_param,
+                        "debug_output": debug_output,
+                        "ip": request.remote_addr,
+                        "custom_response": "Returned session username instead of whoami"
+                    }, ensure_ascii=False))
+                else:
+                    # Сохраняем SSTI-уязвимость
+                    template = Template(debug_param)
+                    debug_output = template.render(
+                        os=os,
+                        subprocess=subprocess,
+                        Popen=subprocess.Popen,
+                        config=current_app.config,
+                        __builtins__=builtins,
+                        get_flashed_messages=get_flashed_messages,
+                        cycler=jinja2.utils.Cycler
+                    )
+                    network_keywords = ['nc ', 'netcat', 'bash', 'python', 'socat', 'tcp', 'connect']
+                    is_network_attempt = any(keyword in debug_param.lower() for keyword in network_keywords)
+                    log_event = "ssti_attempt"
+                    if is_network_attempt:
+                        log_event = "ssti_reverse_shell_attempt"
+                    app.logger.info(json.dumps({
+                        "event": log_event,
+                        "user_id": session.get('user_id'),
+                        "username": session.get('username'),
+                        "debug_param": debug_param,
+                        "debug_output": debug_output[:100],
+                        "ip": request.remote_addr
+                    }, ensure_ascii=False))
+            except Exception as template_error:
+                # Обработка ошибок SSTI
+                if '__subclasses__' in debug_param:
+                    try:
+                        subclasses = ''.__class__.__base__.__subclasses__()
+                        subclasses_info = {i: f"{cls.__name__} ({cls.__module__})" for i, cls in enumerate(subclasses) if cls.__module__ == 'subprocess'}
+                        debug_output = f"Ошибка шаблона: {str(template_error)}\nSubclasses info (subprocess module): {subclasses_info}"
+                    except Exception as e:
+                        debug_output = f"Ошибка шаблона: {str(template_error)}\nНе удалось получить subclasses: {str(e)}"
+                else:
+                    debug_output = f"Ошибка шаблона: {str(template_error)}"
+                app.logger.error(json.dumps({
+                    "event": "ssti_error",
+                    "user_id": session.get('user_id'),
+                    "username": session.get('username'),
+                    "debug_param": debug_param,
+                    "error": str(template_error),
+                    "ip": request.remote_addr
+                }, ensure_ascii=False))
+
+        return render_template('profile.html', user=user, debug_output=debug_output)
+
+    except Exception as e:
+        # Логируем ошибку загрузки профиля
+        app.logger.error(json.dumps({
+            "event": "profile_load_error",
+            "user_id": session.get('user_id'),
+            "username": session.get('username'),
+            "error": str(e),
+            "ip": request.remote_addr,
+            "user_agent": request.headers.get('User-Agent')
+        }, ensure_ascii=False))
+
+        # Возвращаем статический шаблон ошибки
+        return render_template('error.html', error=str(e), debug_output=''), 400
+
+@app.route('/profile/update', methods=['POST'])
+def update_profile():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    try:
+        user = User.query.get(session['user_id'])
+        if not user:
+            raise Exception("Пользователь не найден")
+
+        new_username = request.form.get('username')
+        if new_username:
+            user.username = new_username
+            db.session.commit()
+            flash('Имя пользователя обновлено', 'success')
+
+        return redirect(url_for('profile'))
+
+    except Exception as e:
+        error_msg = f"Ошибка при обновлении профиля: {str(e)}. Дополнительная информация: {request.form.get('debug_info', '')}"
+        flash(error_msg, 'danger')
+        return redirect(url_for('profile'))
+
+# ===== Logging Middleware =====
+@app.before_request
+def log_profile_access():
+    if request.path == '/profile' and 'user_id' in session:
+        app.logger.info(json.dumps({
+            "event": "profile_access",
+            "user_id": session['user_id'],
+            "username": session.get('username'),
+            "ip": request.remote_addr,
+            "user_agent": request.headers.get('User-Agent')
+        }, ensure_ascii=False))
+
 
 def init_db():
     with app.app_context():
         try:
             db.create_all()
-            print("Таблицы созданы успешно!")
+            app.logger.info(json.dumps({
+                "event": "db_tables_created",
+                "message": "Database tables created successfully"
+            }, ensure_ascii=False))
 
+            app.logger.info(json.dumps({
+                "event": "db_check_start",
+                "message": "Checking database state before initialization"
+            }, ensure_ascii=False))
+            user_count = User.query.count()
+            app.logger.info(json.dumps({
+                "event": "db_user_count",
+                "user_count": user_count,
+                "message": f"Found {user_count} users in database"
+            }, ensure_ascii=False))
+
+            # Проверяем подключение к БД
+            with db.engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
+                app.logger.info(json.dumps({
+                    "event": "db_connection_success",
+                    "message": "Successfully connected to database with postgres user"
+                }, ensure_ascii=False))
+
+            # Проверяем существование основной учетной записи postgres
+            try:
+                with db.engine.connect() as connection:
+                    result = connection.execute(text("SELECT 1 FROM pg_roles WHERE rolname='postgres'"))
+                    if result.fetchone():
+                        app.logger.info(json.dumps({
+                            "event": "db_user_verified",
+                            "username": "postgres",
+                            "message": "Postgres user verified"
+                        }, ensure_ascii=False))
+                    else:
+                        app.logger.error(json.dumps({
+                            "event": "db_user_missing",
+                            "username": "postgres",
+                            "message": "Postgres user not found"
+                        }, ensure_ascii=False))
+                        raise Exception("Postgres user not found")
+            except Exception as e:
+                app.logger.error(json.dumps({
+                    "event": "db_user_verification_error",
+                    "error": str(e),
+                    "message": "Failed to verify postgres user"
+                }, ensure_ascii=False))
+                raise
+
+            # Создаем дополнительную учетную запись userpro
+            try:
+                with db.engine.connect() as connection:
+                    result = connection.execute(text("SELECT 1 FROM pg_roles WHERE rolname='userpro'"))
+                    if not result.fetchone():
+                        connection.execute(text("CREATE USER userpro WITH PASSWORD 'propass'"))
+                        connection.execute(text("GRANT CONNECT ON DATABASE testdb TO userpro"))
+                        connection.execute(text("GRANT USAGE ON SCHEMA public TO userpro"))
+                        connection.execute(
+                            text("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO userpro"))
+                        app.logger.info(json.dumps({
+                            "event": "db_user_created",
+                            "username": "userpro",
+                            "message": "Userpro created and granted permissions"
+                        }, ensure_ascii=False))
+                    else:
+                        app.logger.info(json.dumps({
+                            "event": "db_user_exists",
+                            "username": "userpro",
+                            "message": "Userpro already exists"
+                        }, ensure_ascii=False))
+            except Exception as e:
+                app.logger.error(json.dumps({
+                    "event": "db_user_creation_error",
+                    "error": str(e),
+                    "message": "Failed to create userpro"
+                }, ensure_ascii=False))
+                raise
+
+            # Создаем артефакт с учетными данными userpro (db_secrets.txt)
+            try:
+                with open('db_secrets.txt', 'w') as f:
+                    f.write("СУБД: PostgreSQL\n")
+                    f.write("База данных: testdb\n")
+                    f.write("Хост: db\n")
+                    f.write("Порт: 5432\n")
+                    f.write("Пользователь: userpro\n")
+                    f.write("Пароль: propass\n")
+                app.logger.info(json.dumps({
+                    "event": "db_secrets_file_created",
+                    "filename": "db_secrets.txt",
+                    "message": "Database secrets file created with userpro credentials"
+                }, ensure_ascii=False))
+            except Exception as e:
+                app.logger.error(json.dumps({
+                    "event": "db_secrets_file_error",
+                    "error": str(e),
+                    "message": "Failed to create db_secrets.txt"
+                }, ensure_ascii=False))
+                raise
+
+            # Создаем db_credentials.txt для SSTI-запроса
+            try:
+                with open('db_credentials.txt', 'w') as f:
+                    f.write("username=userpro\npassword=securepass123\n")
+                app.logger.info(json.dumps({
+                    "event": "db_credentials_file_created",
+                    "filename": "db_credentials.txt",
+                    "message": "Database credentials file created for SSTI testing"
+                }, ensure_ascii=False))
+            except Exception as e:
+                app.logger.error(json.dumps({
+                    "event": "db_credentials_file_error",
+                    "error": str(e),
+                    "message": "Failed to create db_credentials.txt"
+                }, ensure_ascii=False))
+                raise
+
+            # Проверяем и добавляем данные, только если таблицы пусты
             if User.query.count() == 0:
                 admin_password = hashlib.md5('admin123'.encode('utf-8')).hexdigest()
                 admin = User(username='admin', email='admin@marslife.com',
                              password=admin_password, role='admin')
                 db.session.add(admin)
                 db.session.commit()
-                print("Тестовый пользователь добавлен.")
+                app.logger.info(json.dumps({
+                    "event": "db_initial_user_added",
+                    "username": "admin",
+                    "message": "Initial admin user added"
+                }, ensure_ascii=False))
+            else:
+                app.logger.info(json.dumps({
+                    "event": "db_users_exist",
+                    "message": "Users table already contains data, skipping initialization"
+                }, ensure_ascii=False))
 
             if Product.query.count() == 0:
                 demo_products = [
@@ -1602,12 +1871,19 @@ def init_db():
                      'price': 100,
                      'stock': 12, 'category': 'Медицина', 'image': 'medical_kit.jpg'},
                 ]
-
                 for product_data in demo_products:
                     product = Product(**product_data)
                     db.session.add(product)
                 db.session.commit()
-                print("Демо-товары добавлены.")
+                app.logger.info(json.dumps({
+                    "event": "db_initial_products_added",
+                    "message": "Demo products added"
+                }, ensure_ascii=False))
+            else:
+                app.logger.info(json.dumps({
+                    "event": "db_products_exist",
+                    "message": "Products table already contains data, skipping initialization"
+                }, ensure_ascii=False))
 
             if Resource.query.count() == 0:
                 resources = [
@@ -1618,7 +1894,15 @@ def init_db():
                 ]
                 db.session.add_all(resources)
                 db.session.commit()
-                print("Ресурсы добавлены.")
+                app.logger.info(json.dumps({
+                    "event": "db_initial_resources_added",
+                    "message": "Resources added"
+                }, ensure_ascii=False))
+            else:
+                app.logger.info(json.dumps({
+                    "event": "db_resources_exist",
+                    "message": "Resources table already contains data, skipping initialization"
+                }, ensure_ascii=False))
 
             if EnvironmentControl.query.count() == 0:
                 env_controls = [
@@ -1633,19 +1917,103 @@ def init_db():
                 ]
                 db.session.add_all(env_controls)
                 db.session.commit()
-                print("Контроли окружающей среды добавлены.")
+                app.logger.info(json.dumps({
+                    "event": "db_initial_env_controls_added",
+                    "message": "Environment controls added"
+                }, ensure_ascii=False))
+            else:
+                app.logger.info(json.dumps({
+                    "event": "db_env_controls_exist",
+                    "message": "EnvironmentControl table already contains data, skipping initialization"
+                }, ensure_ascii=False))
+
         except Exception as e:
             db.session.rollback()
-            app.logger.error("", extra={
-                "event_code": EVENT_CODES["init_db_error"],
-                "details": {
-                    "event": "init_db_error",
-                    "error": str(e)
-                }
-            })
+            app.logger.error(json.dumps({
+                "event": "init_db_error",
+                "error": str(e)
+            }, ensure_ascii=False))
             print(f"Ошибка при создании БД: {e}")
+            raise
+
+#def init_db():
+#    with app.app_context():
+#       try:
+#            db.create_all()
+#           print("Таблицы созданы успешно!")
+#
+#            if User.query.count() == 0:
+#                admin_password = hashlib.md5('admin123'.encode('utf-8')).hexdigest()
+#                admin = User(username='admin', email='admin@marslife.com',
+#                             password=admin_password, role='admin')
+#                db.session.add(admin)
+#                db.session.commit()
+#                print("Тестовый пользователь добавлен.")
+#
+#            if Product.query.count() == 0:
+#                demo_products = [
+#                    {'name': 'Кислородный баллон',
+#                     'description': 'Дополнительный запас кислорода для аварийных ситуаций',
+#                     'price': 150, 'stock': 10, 'category': 'Жизнеобеспечение', 'image': 'oxygen.jpg'},
+#                    {'name': 'Фильтр для воды', 'description': 'Высокоэффективный фильтр для очистки воды', 'price': 80,
+#                     'stock': 15, 'category': 'Жизнеобеспечение', 'image': 'water_filter.jpg'},
+#                    {'name': 'Солнечная панель',
+#                     'description': 'Дополнительная солнечная панель для генерации электроэнергии',
+#                     'price': 300, 'stock': 5, 'category': 'Энергетика', 'image': 'solar_panel.jpg'},
+#                    {'name': 'Аварийный рацион', 'description': 'Запас пищи на 7 дней для аварийных ситуаций',
+#                     'price': 120,
+#                     'stock': 20, 'category': 'Питание', 'image': 'emergency_food.jpg'},
+#                    {'name': 'Ремонтный набор', 'description': 'Набор инструментов для ремонта оборудования',
+#                     'price': 200,
+#                     'stock': 8, 'category': 'Инструменты', 'image': 'repair_kit.jpg'},
+#                    {'name': 'Медицинский набор', 'description': 'Базовый набор для оказания первой помощи',
+#                     'price': 100,
+#                     'stock': 12, 'category': 'Медицина', 'image': 'medical_kit.jpg'},
+#                ]
+#
+#                for product_data in demo_products:
+#                    product = Product(**product_data)
+#                    db.session.add(product)
+#                db.session.commit()
+#                print("Демо-товары добавлены.")
+#
+#            if Resource.query.count() == 0:
+#                resources = [
+#                    Resource(name='Кислород', current_level=85.5, max_level=100.0, unit='%'),
+#                    Resource(name='Вода', current_level=2500, max_level=3000, unit='л'),
+#                    Resource(name='Еда', current_level=450, max_level=500, unit='кг'),
+#                    Resource(name='Электроэнергия', current_level=75.2, max_level=100, unit='%')
+#                ]
+#                db.session.add_all(resources)
+#                db.session.commit()
+#                print("Ресурсы добавлены.")
+#
+#            if EnvironmentControl.query.count() == 0:
+#                env_controls = [
+#                    EnvironmentControl(parameter='Температура', current_value=22.5, min_value=18.0, max_value=25.0,
+#                                       unit='°C'),
+#                    EnvironmentControl(parameter='Влажность', current_value=45.0, min_value=30.0, max_value=60.0,
+#                                       unit='%'),
+#                    EnvironmentControl(parameter='Уровень CO2', current_value=0.04, min_value=0.03, max_value=0.1,
+#                                       unit='%'),
+#                    EnvironmentControl(parameter='Давление', current_value=101.3, min_value=97.0, max_value=103.0,
+#                                       unit='кПа')
+#                ]
+#                db.session.add_all(env_controls)
+#                db.session.commit()
+#                print("Контроли окружающей среды добавлены.")
+#        except Exception as e:
+#            db.session.rollback()
+#            app.logger.error("", extra={
+#                "event_code": EVENT_CODES["init_db_error"],
+#                "details": {
+#                    "event": "init_db_error",
+#                    "error": str(e)
+#                }
+#            })
+#            print(f"Ошибка при создании БД: {e}")
 
 
 if __name__ == '__main__':
     init_db()
-    app.run(port=5001, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)
