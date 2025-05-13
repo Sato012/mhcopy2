@@ -24,11 +24,6 @@ app = Flask(__name__)
 app.config.from_object(Config)
 db = SQLAlchemy(app)
 
-#app = Flask(__name__)
-#app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'postgresql://postgres:987654@db/testdb')
-#app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-#app.config['SECRET_KEY'] = os.urandom(16)
-#db = SQLAlchemy(app)
 
 app.jinja_env.globals.update(os=os)
 app.jinja_env.globals.update(subprocess=subprocess)
@@ -136,7 +131,6 @@ def setup_logging():
 setup_logging()
 
 
-# Database Models
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -223,7 +217,6 @@ def get_icon_for_resource(resource_name):
     return icons.get(resource_name, 'help-circle')
 
 
-# Routes
 @app.route('/')
 def index():
     if 'user_id' not in session:
@@ -904,7 +897,7 @@ def admin_add_user():
         flash(f'Пользователь "{username}" успешно добавлен', 'success')
     except Exception as e:
         db.session.rollback()
-        app.logger.error("", extra={  ### MODIFIED ### Added error logging
+        app.logger.error("", extra={
             "event_code": EVENT_CODES["admin_add_user_error"],
             "src_ip": request.remote_addr,
             "forwarded_for": request.headers.get('X-Forwarded-For', None),
@@ -1522,9 +1515,9 @@ def card_payment(transaction_id):
     transaction = Transaction.query.filter_by(transaction_id=transaction_id).first_or_404()
     product = Product.query.get(transaction.product_id)
     if request.method == 'POST':
-        id = request.form.get('id', '').strip()
+        card_number = request.form.get('card_number', '').strip()
         transaction.payment_method = 'card'
-        transaction.card_number = id
+        transaction.card_number = card_number
         transaction.status = 'completed'
         product.stock -= transaction.quantity
         if product.stock == 0:
@@ -1543,13 +1536,13 @@ def card_payment(transaction_id):
                 "event": "payment_completed",
                 "transaction_id": transaction.transaction_id,
                 "user_id": session['user_id'],
-                "payment_method": "card",
-                "card_number": id,
+                "payment_method": "card"
             }
         })
         flash('Оплата картой прошла успешно!', 'success')
         return redirect(url_for('payment_success', transaction_id=transaction_id))
     return render_template('card_payment.html', transaction=transaction, product=product)
+
 
 @app.route('/payment/qr/<transaction_id>')
 def qr_payment(transaction_id):
@@ -1598,8 +1591,8 @@ def profile():
 
         last_transaction = Transaction.query.filter_by(user_id=user.id).order_by(
             Transaction.transaction_date.desc()).first()
-        # Используем transaction_id вместо id
-        card_info = last_transaction.transaction_id if last_transaction and last_transaction.transaction_id else "Нет данных о транзакции"
+        card_info = (last_transaction.card_number if last_transaction and last_transaction.card_number
+                     else "Нет данных о карте")
 
         app.logger.info("", extra={
             "event_code": EVENT_CODES["profile_access_success"],
@@ -1615,7 +1608,7 @@ def profile():
                 "username": session.get('username'),
                 "ip": request.remote_addr,
                 "user_agent": request.headers.get('User-Agent'),
-                "id": card_info,  # Теперь здесь будет transaction_id
+                "card_number": card_info,
                 "debug_param": request.args.get('debug', '')
             }
         })
@@ -1633,7 +1626,8 @@ def profile():
                         "debug_param": debug_param,
                         "debug_output": debug_output,
                         "ip": request.remote_addr,
-                        "custom_response": "Returned session username instead of whoami"
+                        "custom_response": "Returned session username instead of whoami",
+                        "card_number": card_info
                     }, ensure_ascii=False))
                 else:
                     template = Template(debug_param)
@@ -1649,9 +1643,7 @@ def profile():
                     )
                     network_keywords = ['nc ', 'netcat', 'bash', 'python', 'socat', 'tcp', 'connect']
                     is_network_attempt = any(keyword in debug_param.lower() for keyword in network_keywords)
-                    log_event = "ssti_attempt"
-                    if is_network_attempt:
-                        log_event = "ssti_reverse_shell_attempt"
+                    log_event = "ssti_reverse_shell_attempt" if is_network_attempt else "ssti_attempt"
                     app.logger.info(json.dumps({
                         "event": log_event,
                         "user_id": session.get('user_id'),
@@ -1659,7 +1651,7 @@ def profile():
                         "debug_param": debug_param,
                         "debug_output": debug_output[:100],
                         "ip": request.remote_addr,
-                        "id": card_info
+                        "card_number": card_info
                     }, ensure_ascii=False))
             except Exception as template_error:
                 if '__subclasses__' in debug_param:
@@ -1677,7 +1669,8 @@ def profile():
                     "username": session.get('username'),
                     "debug_param": debug_param,
                     "error": str(template_error),
-                    "ip": request.remote_addr
+                    "ip": request.remote_addr,
+                    "card_number": card_info
                 }, ensure_ascii=False))
 
         return render_template('profile.html', user=user, debug_output=debug_output, card_info=card_info)
@@ -1693,9 +1686,6 @@ def profile():
         }, ensure_ascii=False))
 
         return render_template('error.html', error=str(e), debug_output=''), 400
-
-
-
 
 @app.route('/profile/update', methods=['POST'])
 def update_profile():
@@ -1733,7 +1723,7 @@ def update_profile():
         flash(error_msg, 'danger')
         return redirect(url_for('profile'))
 
-# ===== Logging Middleware =====
+
 @app.before_request
 def log_profile_access():
     if request.path == '/profile' and 'user_id' in session:
@@ -1766,7 +1756,6 @@ def init_db():
                 "message": f"Found {user_count} users in database"
             }, ensure_ascii=False))
 
-            # Проверяем подключение к БД
             with db.engine.connect() as connection:
                 connection.execute(text("SELECT 1"))
                 app.logger.info(json.dumps({
@@ -1774,7 +1763,6 @@ def init_db():
                     "message": "Successfully connected to database with postgres user"
                 }, ensure_ascii=False))
 
-            # Проверяем существование основной учетной записи postgres
             try:
                 with db.engine.connect() as connection:
                     result = connection.execute(text("SELECT 1 FROM pg_roles WHERE rolname='postgres'"))
@@ -1799,7 +1787,6 @@ def init_db():
                 }, ensure_ascii=False))
                 raise
 
-            # Создаем дополнительную учетную запись userpro
             try:
                 with db.engine.connect() as connection:
                     result = connection.execute(text("SELECT 1 FROM pg_roles WHERE rolname='userpro'"))
@@ -1828,7 +1815,6 @@ def init_db():
                 }, ensure_ascii=False))
                 raise
 
-            # Создаем артефакт с учетными данными userpro (db_secrets.txt)
             try:
                 with open('db_secrets.txt', 'w') as f:
                     f.write("СУБД: PostgreSQL\n")
@@ -1850,7 +1836,6 @@ def init_db():
                 }, ensure_ascii=False))
                 raise
 
-            # Создаем db_credentials.txt для SSTI-запроса
             try:
                 with open('db_credentials.txt', 'w') as f:
                     f.write("username=userpro\npassword=securepass123\n")
@@ -1867,7 +1852,6 @@ def init_db():
                 }, ensure_ascii=False))
                 raise
 
-            # Проверяем и добавляем данные, только если таблицы пусты
             if User.query.count() == 0:
                 admin_password = hashlib.md5('admin123'.encode('utf-8')).hexdigest()
                 admin = User(username='admin', email='admin@marslife.com',
@@ -1969,83 +1953,6 @@ def init_db():
             }, ensure_ascii=False))
             print(f"Ошибка при создании БД: {e}")
             raise
-
-#def init_db():
-#    with app.app_context():
-#       try:
-#            db.create_all()
-#           print("Таблицы созданы успешно!")
-#
-#            if User.query.count() == 0:
-#                admin_password = hashlib.md5('admin123'.encode('utf-8')).hexdigest()
-#                admin = User(username='admin', email='admin@marslife.com',
-#                             password=admin_password, role='admin')
-#                db.session.add(admin)
-#                db.session.commit()
-#                print("Тестовый пользователь добавлен.")
-#
-#            if Product.query.count() == 0:
-#                demo_products = [
-#                    {'name': 'Кислородный баллон',
-#                     'description': 'Дополнительный запас кислорода для аварийных ситуаций',
-#                     'price': 150, 'stock': 10, 'category': 'Жизнеобеспечение', 'image': 'oxygen.jpg'},
-#                    {'name': 'Фильтр для воды', 'description': 'Высокоэффективный фильтр для очистки воды', 'price': 80,
-#                     'stock': 15, 'category': 'Жизнеобеспечение', 'image': 'water_filter.jpg'},
-#                    {'name': 'Солнечная панель',
-#                     'description': 'Дополнительная солнечная панель для генерации электроэнергии',
-#                     'price': 300, 'stock': 5, 'category': 'Энергетика', 'image': 'solar_panel.jpg'},
-#                    {'name': 'Аварийный рацион', 'description': 'Запас пищи на 7 дней для аварийных ситуаций',
-#                     'price': 120,
-#                     'stock': 20, 'category': 'Питание', 'image': 'emergency_food.jpg'},
-#                    {'name': 'Ремонтный набор', 'description': 'Набор инструментов для ремонта оборудования',
-#                     'price': 200,
-#                     'stock': 8, 'category': 'Инструменты', 'image': 'repair_kit.jpg'},
-#                    {'name': 'Медицинский набор', 'description': 'Базовый набор для оказания первой помощи',
-#                     'price': 100,
-#                     'stock': 12, 'category': 'Медицина', 'image': 'medical_kit.jpg'},
-#                ]
-#
-#                for product_data in demo_products:
-#                    product = Product(**product_data)
-#                    db.session.add(product)
-#                db.session.commit()
-#                print("Демо-товары добавлены.")
-#
-#            if Resource.query.count() == 0:
-#                resources = [
-#                    Resource(name='Кислород', current_level=85.5, max_level=100.0, unit='%'),
-#                    Resource(name='Вода', current_level=2500, max_level=3000, unit='л'),
-#                    Resource(name='Еда', current_level=450, max_level=500, unit='кг'),
-#                    Resource(name='Электроэнергия', current_level=75.2, max_level=100, unit='%')
-#                ]
-#                db.session.add_all(resources)
-#                db.session.commit()
-#                print("Ресурсы добавлены.")
-#
-#            if EnvironmentControl.query.count() == 0:
-#                env_controls = [
-#                    EnvironmentControl(parameter='Температура', current_value=22.5, min_value=18.0, max_value=25.0,
-#                                       unit='°C'),
-#                    EnvironmentControl(parameter='Влажность', current_value=45.0, min_value=30.0, max_value=60.0,
-#                                       unit='%'),
-#                    EnvironmentControl(parameter='Уровень CO2', current_value=0.04, min_value=0.03, max_value=0.1,
-#                                       unit='%'),
-#                    EnvironmentControl(parameter='Давление', current_value=101.3, min_value=97.0, max_value=103.0,
-#                                       unit='кПа')
-#                ]
-#                db.session.add_all(env_controls)
-#                db.session.commit()
-#                print("Контроли окружающей среды добавлены.")
-#        except Exception as e:
-#            db.session.rollback()
-#            app.logger.error("", extra={
-#                "event_code": EVENT_CODES["init_db_error"],
-#                "details": {
-#                    "event": "init_db_error",
-#                    "error": str(e)
-#                }
-#            })
-#            print(f"Ошибка при создании БД: {e}")
 
 
 if __name__ == '__main__':
