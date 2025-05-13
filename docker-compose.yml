@@ -22,7 +22,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "5001:5001"
+      - "7000:7000"
     environment:
       - DATABASE_URL=postgresql://postgres:987654@db/testdb
     depends_on:
