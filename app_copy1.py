@@ -92,7 +92,7 @@ def setup_logging():
                     "app_proto": "http",
                     "src_ip": src_ip,
                     "src_port": src_port,
-                    "dest_port": "5001"
+                    "dest_port": "7000"
                 },
                 "http": {
                     "hostname": "127.0.0.1",
