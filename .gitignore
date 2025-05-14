@@ -1,6 +1,15 @@
-.env
- *.py
- docker-compose.yml
- Dockerfile
- requirements.txt
- Config.cpython-313.pyc
+
+*.pyc
+*.pyo
+__pycache__/
+
+.venv/
+venv/
+.vscode/
+
+db_credentials
+db_secrets
+
+.code-workspace
+
+/bin/
