@@ -1466,7 +1466,10 @@ def payment(transaction_id):
         db.session.commit()
         return redirect(url_for('product_detail', product_id=product.id))
     if request.method == 'POST':
+        card_number = request.form.get('card_number', '').strip()
         try:
+            transaction.payment_method = 'card'
+            transaction.card_number = card_number
             transaction.status = 'completed'
             product.stock -= transaction.quantity
             if product.stock == 0:
@@ -1484,7 +1487,9 @@ def payment(transaction_id):
                 "details": {
                     "event": "payment_completed",
                     "transaction_id": transaction.transaction_id,
-                    "user_id": session['user_id']
+                    "user_id": session['user_id'],
+                    "payment_method": "card",
+                    "card_number": card_number
                 }
             })
             flash('Оплата прошла успешно!', 'success')
@@ -1536,13 +1541,13 @@ def card_payment(transaction_id):
                 "event": "payment_completed",
                 "transaction_id": transaction.transaction_id,
                 "user_id": session['user_id'],
-                "payment_method": "card"
+                "payment_method": "card",
+                "card_number": card_number
             }
         })
         flash('Оплата картой прошла успешно!', 'success')
         return redirect(url_for('payment_success', transaction_id=transaction_id))
     return render_template('card_payment.html', transaction=transaction, product=product)
-
 
 @app.route('/payment/qr/<transaction_id>')
 def qr_payment(transaction_id):
